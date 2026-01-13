@@ -12,11 +12,11 @@ This document tracks implementation progress for the BandBrain MVP.
 |-------|-------------|-----------|----------|
 | Phase 1: Foundation | 53 | 38 | 72% |
 | Phase 2: Core Features | 63 | 39 | 62% |
-| Phase 3: Audio & Visualization | 21 | 0 | 0% |
-| Phase 4: Tab & Training | 52 | 19 | 37% |
+| Phase 3: Audio & Visualization | 21 | 8 | 38% |
+| Phase 4: Tab & Training | 52 | 24 | 46% |
 | Phase 5: Recording & Setlists | 46 | 0 | 0% |
 | Phase 6: Polish & Testing | 52 | 0 | 0% |
-| **Total** | **287** | **96** | **33%** |
+| **Total** | **287** | **109** | **38%** |
 
 ---
 
@@ -200,15 +200,15 @@ This document tracks implementation progress for the BandBrain MVP.
 - [ ] 3.1.4 Trigger waveform computation on upload
 - [ ] 3.1.5 Add loading state
 
-### 3.2 Waveform Player (10 tasks)
-- [ ] 3.2.1 Install wavesurfer.js
-- [ ] 3.2.2 Create components/audio/WaveformPlayer.tsx
-- [ ] 3.2.3 Implement play/pause controls
-- [ ] 3.2.4 Add seek functionality
-- [ ] 3.2.5 Display pre-computed peaks
-- [ ] 3.2.6 Add volume control
-- [ ] 3.2.7 Add playback speed control
-- [ ] 3.2.8 Style waveform to match theme
+### 3.2 Waveform Player (10 tasks) - 8/10 ✅
+- [x] 3.2.1 Install wavesurfer.js
+- [x] 3.2.2 Create components/audio/WaveformPlayer.tsx
+- [x] 3.2.3 Implement play/pause controls
+- [x] 3.2.4 Add seek functionality
+- [x] 3.2.5 Display pre-computed peaks
+- [x] 3.2.6 Add volume control
+- [x] 3.2.7 Add playback speed control
+- [x] 3.2.8 Style waveform to match theme
 - [ ] 3.2.9 Add keyboard shortcuts
 - [ ] 3.2.10 Integrate on song detail page
 
@@ -271,12 +271,12 @@ This document tracks implementation progress for the BandBrain MVP.
 - [ ] 4.4.6 Add loop option
 - [ ] 4.4.7 Create chords page
 
-### 4.5 Transposition Helper (6 tasks)
-- [ ] 4.5.1 Create lib/music/transposition.ts
-- [ ] 4.5.2 Implement transpose function
-- [ ] 4.5.3 Implement transposeProgression function
-- [ ] 4.5.4 Handle flats and sharps
-- [ ] 4.5.5 Create TransposeHelper component
+### 4.5 Transposition Helper (6 tasks) - 5/6 ✅
+- [x] 4.5.1 Create lib/music/transposition.ts
+- [x] 4.5.2 Implement transpose function
+- [x] 4.5.3 Implement transposeProgression function
+- [x] 4.5.4 Handle flats and sharps
+- [x] 4.5.5 Create TransposeHelper component
 - [ ] 4.5.6 Add to song detail page
 
 ### 4.6 Daily Lick System (8 tasks)
@@ -536,6 +536,23 @@ Track work sessions here to maintain context between Claude sessions.
 - Fixed all lint errors (scheduler self-reference, unused variables)
 - **Progress:** 96/287 tasks (33%)
 - **Next:** Continue with waveform player, AlphaTab, daily lick system
+
+### Session 5 - 2026-01-13 (continued)
+- Completed Phase 3.2 - Waveform Player (8/10 tasks):
+  - Installed wavesurfer.js
+  - Created WaveformPlayer component with dynamic import
+  - Added play/pause, seek, volume, and playback speed controls
+  - Styled waveform to match app theme
+  - Supports pre-computed peaks for fast rendering
+- Completed Phase 4.5 - Transposition Helper (5/6 tasks):
+  - Created lib/music/transposition.ts with comprehensive utilities
+  - Implemented transposeNote, transposeChord, transposeProgression
+  - Full support for sharps/flats with enharmonic conversion
+  - Added key detection, scale generation, relative/parallel key functions
+  - Created TransposeHelper component with note selectors
+- Added Textarea UI component
+- **Progress:** 109/287 tasks (38%)
+- **Next:** Continue with keyboard shortcuts, song detail integration, daily lick system
 
 ---
 

@@ -32,7 +32,8 @@
     "posthog-js": "^1.319.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "wavesurfer.js": "^7.12.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
