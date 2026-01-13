@@ -19,7 +19,7 @@ BandBrain is a web application designed to help gigging musicians efficiently ma
 | **Audio Analysis** | Essentia.js + Paid API fallback | Browser-based analysis with server backup |
 | **Tab Rendering** | AlphaTab | Guitar Pro format support, MIDI playback |
 | **Waveform Visualization** | wavesurfer.js | Interactive waveforms with regions/comments |
-| **Error Tracking** | Sentry | Production error monitoring |
+| **Error Tracking** | PostHog | Production error monitoring & analytics |
 | **Testing** | Vitest + Playwright | Unit tests + E2E |
 
 ---
@@ -1024,7 +1024,7 @@ export function AlphaTabViewer({ alphaTexData, gpFileUrl, onReady }: AlphaTabVie
 "use client";
 
 import { Component, ReactNode } from "react";
-import * as Sentry from "@sentry/nextjs";
+import posthog from "posthog-js";
 
 interface Props {
   children: ReactNode;
@@ -1047,8 +1047,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    Sentry.captureException(error, {
-      extra: { componentStack: errorInfo.componentStack },
+    posthog.capture("error_boundary_caught", {
+      error: error.message,
+      componentStack: errorInfo.componentStack,
     });
   }
 
@@ -1083,7 +1084,7 @@ export class ErrorBoundary extends Component<Props, State> {
 // hooks/useMutationWithRetry.ts
 import { useMutation } from "convex/react";
 import { useState, useCallback } from "react";
-import * as Sentry from "@sentry/nextjs";
+import posthog from "posthog-js";
 
 interface RetryOptions {
   maxRetries?: number;
@@ -1132,8 +1133,8 @@ export function useMutationWithRetry<T extends (...args: any[]) => any>(
       // All retries failed
       setError(lastError);
       setIsLoading(false);
-      
-      Sentry.captureException(lastError);
+
+      posthog.capture("mutation_failed", { error: lastError?.message });
       onError?.(lastError!);
       
       throw lastError;
@@ -1467,9 +1468,9 @@ CONVEX_AUTH_SECRET=your-secret-here
 # AI Generation
 ANTHROPIC_API_KEY=sk-ant-xxxxx
 
-# Error Tracking
-NEXT_PUBLIC_SENTRY_DSN=https://xxxxx@sentry.io/xxxxx
-SENTRY_AUTH_TOKEN=xxxxx
+# Error Tracking & Analytics
+NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxx
+NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
 
 # Site URL (for auth callbacks)
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
@@ -1552,7 +1553,8 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 │   └── components/
 ├── e2e/
 │   └── auth.spec.ts
-└── sentry.client.config.ts
+└── lib/
+    └── posthog.ts
 ```
 
 ---
@@ -1565,7 +1567,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 - [ ] User CRUD with soft deletes
 - [ ] Band CRUD with soft deletes
 - [ ] Basic error boundary
-- [ ] Sentry integration
+- [ ] PostHog integration
 
 ### Phase 2: Core Features (Week 3-4)
 - [ ] Song CRUD with file uploads
@@ -1618,7 +1620,7 @@ Musician practice and recording management app.
 - Tailwind CSS + shadcn/ui
 - AlphaTab (tab rendering - lazy loaded)
 - wavesurfer.js (waveform visualization)
-- Sentry (error tracking)
+- PostHog (error tracking & analytics)
 - Vercel deployment
 
 ## Key Commands
@@ -1646,7 +1648,7 @@ Convex Auth with Password provider. No external auth service.
 - Use server components by default
 - Lazy load AlphaTab only on pages that need it
 - All mutations should use soft deletes
-- Wrap risky operations in try/catch, report to Sentry
+- Wrap risky operations in try/catch, report to PostHog
 - File uploads must validate size client-side AND server-side
 
 ## Testing

@@ -40,7 +40,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **Tab Rendering**: AlphaTab (lazy loaded)
 - **Waveform**: wavesurfer.js
-- **Error Tracking**: Sentry
+- **Error Tracking**: PostHog
 - **Testing**: Vitest + Playwright
 - **Deployment**: Vercel (Next.js) + Convex Cloud (backend)
 
@@ -190,7 +190,7 @@ User Action → Mutation → Database Update → Query Re-runs → UI Updates
 
 **Client-side:**
 - ErrorBoundary component wraps app sections
-- Sentry captures unhandled errors
+- PostHog captures unhandled errors
 - `useMutationWithRetry` hook for automatic retry with backoff
 
 **Server-side (Convex):**
@@ -349,7 +349,7 @@ const activeRecords = await ctx.db
 
 **Error handling:**
 - Wrap risky operations in try/catch
-- Report errors to Sentry
+- Report errors to PostHog
 - Return user-friendly error messages
 
 **Performance:**
@@ -375,9 +375,9 @@ CONVEX_AUTH_SECRET=your-secret-here
 # AI Generation
 ANTHROPIC_API_KEY=sk-ant-xxxxx
 
-# Error Tracking
-NEXT_PUBLIC_SENTRY_DSN=https://xxxxx@sentry.io/xxxxx
-SENTRY_AUTH_TOKEN=xxxxx
+# Error Tracking & Analytics
+NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxx
+NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
 
 # Site URL (for auth callbacks)
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
