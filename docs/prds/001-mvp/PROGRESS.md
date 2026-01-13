@@ -582,6 +582,25 @@ Track work sessions here to maintain context between Claude sessions.
 - **Progress:** 145/287 tasks (51%)
 - **Next:** Create UI pages for recording projects, setlists, bounces
 
+### Session 7 - 2026-01-13 (Security & Schema Fixes)
+- **Fixed critical security vulnerabilities:**
+  - Added ownership checks to bands mutations (getById, update, softDelete, restore)
+  - Added ownership checks to songs mutations (listByBand, getById, update, softDelete, restore)
+  - Added ownership checks to files mutations (listBySong, softDelete)
+  - Added authentication to getFileUrl query (was unauthenticated)
+  - Enforced rate limit in saveSongFile (was checked but not enforced)
+  - Fixed authorization logic in licks updateLick mutation
+- **Fixed schema mismatches:**
+  - bands.create: Added required `myInstruments` field
+  - bands.update: Fixed member object structure (`instrument` vs `instruments`)
+  - songs: Use `durationSeconds` instead of `duration`, removed non-schema `artist` field
+  - files: Added `version` and `isPrimary` fields to songFiles, use `projectId` for learningProjectFiles
+  - practiceSessions: Aligned with schema (`date`, `durationMinutes`, `songsWorked`)
+  - licks: Use schema field names (`instrument`, `tempoSuggestion`, `alphaTexData`, `description`)
+- Verified lint and type checks pass
+- **Progress:** 145/287 tasks (51%)
+- **Next:** Continue with UI pages for recording projects, setlists, AlphaTab integration
+
 ---
 
 ## Notes
