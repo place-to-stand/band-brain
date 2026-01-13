@@ -598,8 +598,20 @@ Track work sessions here to maintain context between Claude sessions.
   - practiceSessions: Aligned with schema (`date`, `durationMinutes`, `songsWorked`)
   - licks: Use schema field names (`instrument`, `tempoSuggestion`, `alphaTexData`, `description`)
 - Verified lint and type checks pass
-- **Progress:** 145/287 tasks (51%)
-- **Next:** Continue with UI pages for recording projects, setlists, AlphaTab integration
+- **Created Recording Projects UI (Phase 5.1 UI tasks):**
+  - RecordingProjectCard component
+  - RecordingProjectForm component (create/edit)
+  - Recording projects list page with status filters
+  - Recording project detail page with status progression
+  - New/Edit recording project pages
+- **Created Setlists UI (Phase 5.6 & 5.7 UI tasks):**
+  - SetlistCard component
+  - SetlistForm component (create/edit)
+  - Setlists list page
+  - Setlist detail page with duration tracking
+  - New/Edit setlist pages
+- **Progress:** 157/287 tasks (55%)
+- **Next:** AlphaTab integration, instrument parts module, settings pages
 
 ---
 
