@@ -7,6 +7,13 @@ export const listByBand = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+    const userId = identity.subject as Id<"users">;
+
+    // Verify user owns this band
+    const band = await ctx.db.get(args.bandId);
+    if (!band || band.deletedAt || band.userId !== userId) {
+      return [];
+    }
 
     return await ctx.db
       .query("songs")
@@ -22,9 +29,14 @@ export const getById = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
+    const userId = identity.subject as Id<"users">;
 
     const song = await ctx.db.get(args.id);
     if (!song || song.deletedAt) return null;
+
+    // Verify user owns the band this song belongs to
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.userId !== userId) return null;
 
     return song;
   },
@@ -34,13 +46,13 @@ export const create = mutation({
   args: {
     bandId: v.id("bands"),
     title: v.string(),
-    artist: v.optional(v.string()),
     key: v.optional(v.string()),
     mode: v.optional(v.string()),
     tempo: v.optional(v.number()),
     timeSignature: v.optional(v.string()),
-    duration: v.optional(v.number()),
+    durationSeconds: v.optional(v.number()),
     notes: v.optional(v.string()),
+    practiceStatus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -57,14 +69,13 @@ export const create = mutation({
     return await ctx.db.insert("songs", {
       bandId: args.bandId,
       title: args.title,
-      artist: args.artist,
       key: args.key,
       mode: args.mode,
       tempo: args.tempo,
       timeSignature: args.timeSignature || "4/4",
-      duration: args.duration,
+      durationSeconds: args.durationSeconds,
       notes: args.notes,
-      practiceStatus: "not_started",
+      practiceStatus: args.practiceStatus || "learning",
       createdAt: now,
       updatedAt: now,
     });
@@ -75,29 +86,28 @@ export const update = mutation({
   args: {
     id: v.id("songs"),
     title: v.optional(v.string()),
-    artist: v.optional(v.string()),
     key: v.optional(v.string()),
     mode: v.optional(v.string()),
     tempo: v.optional(v.number()),
     timeSignature: v.optional(v.string()),
-    duration: v.optional(v.number()),
+    durationSeconds: v.optional(v.number()),
     notes: v.optional(v.string()),
-    practiceStatus: v.optional(
-      v.union(
-        v.literal("not_started"),
-        v.literal("learning"),
-        v.literal("refining"),
-        v.literal("performance_ready")
-      )
-    ),
+    practiceStatus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+    const userId = identity.subject as Id<"users">;
 
     const song = await ctx.db.get(args.id);
     if (!song || song.deletedAt) {
       throw new Error("Song not found");
+    }
+
+    // Verify user owns the band this song belongs to
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.userId !== userId) {
+      throw new Error("Not authorized to update this song");
     }
 
     const { id, ...updates } = args;
@@ -113,10 +123,17 @@ export const softDelete = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+    const userId = identity.subject as Id<"users">;
 
     const song = await ctx.db.get(args.id);
     if (!song || song.deletedAt) {
       throw new Error("Song not found");
+    }
+
+    // Verify user owns the band this song belongs to
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.userId !== userId) {
+      throw new Error("Not authorized to delete this song");
     }
 
     await ctx.db.patch(args.id, {
@@ -131,10 +148,17 @@ export const restore = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+    const userId = identity.subject as Id<"users">;
 
     const song = await ctx.db.get(args.id);
     if (!song) {
       throw new Error("Song not found");
+    }
+
+    // Verify user owns the band this song belongs to
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.userId !== userId) {
+      throw new Error("Not authorized to restore this song");
     }
 
     await ctx.db.patch(args.id, {

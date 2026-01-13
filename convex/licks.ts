@@ -110,16 +110,14 @@ export const listByStyle = query({
 
 export const saveLick = mutation({
   args: {
-    title: v.string(),
     style: v.string(),
+    instrument: v.string(),
     difficulty: v.number(),
     key: v.optional(v.string()),
-    tempo: v.optional(v.number()),
-    timeSignature: v.optional(v.string()),
-    alphaTex: v.optional(v.string()),
-    tabFileId: v.optional(v.id("_storage")),
-    audioFileId: v.optional(v.id("_storage")),
-    notes: v.optional(v.string()),
+    tempoSuggestion: v.optional(v.number()),
+    alphaTexData: v.optional(v.string()),
+    gpFileStorageId: v.optional(v.id("_storage")),
+    description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -130,18 +128,15 @@ export const saveLick = mutation({
     return await ctx.db.insert("licks", {
       userId,
       source: "user",
-      title: args.title,
       style: args.style,
+      instrument: args.instrument,
       difficulty: args.difficulty,
       key: args.key,
-      tempo: args.tempo,
-      timeSignature: args.timeSignature,
-      alphaTex: args.alphaTex,
-      tabFileId: args.tabFileId,
-      audioFileId: args.audioFileId,
-      notes: args.notes,
+      tempoSuggestion: args.tempoSuggestion,
+      alphaTexData: args.alphaTexData,
+      gpFileStorageId: args.gpFileStorageId,
+      description: args.description,
       createdAt: now,
-      updatedAt: now,
     });
   },
 });
@@ -149,14 +144,13 @@ export const saveLick = mutation({
 export const updateLick = mutation({
   args: {
     id: v.id("licks"),
-    title: v.optional(v.string()),
     style: v.optional(v.string()),
+    instrument: v.optional(v.string()),
     difficulty: v.optional(v.number()),
     key: v.optional(v.string()),
-    tempo: v.optional(v.number()),
-    timeSignature: v.optional(v.string()),
-    alphaTex: v.optional(v.string()),
-    notes: v.optional(v.string()),
+    tempoSuggestion: v.optional(v.number()),
+    alphaTexData: v.optional(v.string()),
+    description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -169,7 +163,7 @@ export const updateLick = mutation({
     }
 
     // Users can only edit their own licks
-    if (lick.userId !== userId && lick.source !== "user") {
+    if (lick.userId !== userId) {
       throw new Error("Cannot edit this lick");
     }
 
@@ -178,10 +172,7 @@ export const updateLick = mutation({
       Object.entries(updates).filter(([, v]) => v !== undefined)
     );
 
-    await ctx.db.patch(id, {
-      ...filteredUpdates,
-      updatedAt: Date.now(),
-    });
+    await ctx.db.patch(id, filteredUpdates);
   },
 });
 
@@ -293,28 +284,27 @@ export const incrementAiGenerationCount = internalMutation({
 export const saveGeneratedLick = internalMutation({
   args: {
     userId: v.id("users"),
-    title: v.string(),
     style: v.string(),
+    instrument: v.string(),
     difficulty: v.number(),
     key: v.optional(v.string()),
-    tempo: v.optional(v.number()),
-    timeSignature: v.optional(v.string()),
-    alphaTex: v.string(),
+    tempoSuggestion: v.optional(v.number()),
+    alphaTexData: v.string(),
+    description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     return await ctx.db.insert("licks", {
       userId: args.userId,
       source: "ai",
-      title: args.title,
       style: args.style,
+      instrument: args.instrument,
       difficulty: args.difficulty,
       key: args.key,
-      tempo: args.tempo,
-      timeSignature: args.timeSignature,
-      alphaTex: args.alphaTex,
+      tempoSuggestion: args.tempoSuggestion,
+      alphaTexData: args.alphaTexData,
+      description: args.description,
       createdAt: now,
-      updatedAt: now,
     });
   },
 });
@@ -403,16 +393,16 @@ Return ONLY the alphaTex code, no explanations.`;
     // Save the generated lick
     const lickId = await ctx.runMutation(internal.licks.saveGeneratedLick, {
       userId,
-      title: `AI ${args.style} Lick`,
       style: args.style,
+      instrument: "guitar",
       difficulty: args.difficulty,
       key: args.key,
-      tempo: 120,
-      timeSignature: "4/4",
-      alphaTex,
+      tempoSuggestion: 120,
+      alphaTexData: alphaTex,
+      description: `AI-generated ${args.style} lick`,
     });
 
-    return { lickId, alphaTex };
+    return { lickId, alphaTexData: alphaTex };
   },
 });
 

@@ -25,24 +25,23 @@ export const list = query({
 
 export const listByDateRange = query({
   args: {
-    startDate: v.number(),
-    endDate: v.number(),
+    startDate: v.string(),
+    endDate: v.string(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
     const userId = identity.subject as Id<"users">;
 
-    return await ctx.db
+    const sessions = await ctx.db
       .query("practiceSessions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) =>
-        q.and(
-          q.gte(q.field("startTime"), args.startDate),
-          q.lte(q.field("startTime"), args.endDate)
-        )
-      )
       .collect();
+
+    // Filter by date range
+    return sessions.filter(
+      (s) => s.date >= args.startDate && s.date <= args.endDate
+    );
   },
 });
 
@@ -62,34 +61,27 @@ export const getById = query({
 
 export const create = mutation({
   args: {
-    songId: v.optional(v.id("songs")),
+    date: v.string(),
+    durationMinutes: v.optional(v.number()),
+    bandId: v.optional(v.id("bands")),
     learningProjectId: v.optional(v.id("learningProjects")),
-    startTime: v.number(),
-    endTime: v.optional(v.number()),
-    duration: v.optional(v.number()),
+    songsWorked: v.optional(v.array(v.id("songs"))),
     notes: v.optional(v.string()),
-    focusAreas: v.optional(v.array(v.string())),
-    rating: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.subject as Id<"users">;
 
-    // At least one of songId or learningProjectId should be provided
-    if (!args.songId && !args.learningProjectId) {
-      throw new Error("Either songId or learningProjectId must be provided");
-    }
-
-    // Verify song exists if provided
-    if (args.songId) {
-      const song = await ctx.db.get(args.songId);
-      if (!song || song.deletedAt) {
-        throw new Error("Song not found");
+    // Verify band exists and belongs to user if provided
+    if (args.bandId) {
+      const band = await ctx.db.get(args.bandId);
+      if (!band || band.deletedAt || band.userId !== userId) {
+        throw new Error("Band not found");
       }
     }
 
-    // Verify learning project exists if provided
+    // Verify learning project exists and belongs to user if provided
     if (args.learningProjectId) {
       const project = await ctx.db.get(args.learningProjectId);
       if (!project || project.deletedAt || project.userId !== userId) {
@@ -97,19 +89,30 @@ export const create = mutation({
       }
     }
 
+    // Verify songs exist and belong to user's bands if provided
+    if (args.songsWorked && args.songsWorked.length > 0) {
+      for (const songId of args.songsWorked) {
+        const song = await ctx.db.get(songId);
+        if (!song || song.deletedAt) {
+          throw new Error("Song not found");
+        }
+        const band = await ctx.db.get(song.bandId);
+        if (!band || band.userId !== userId) {
+          throw new Error("Not authorized to log practice for this song");
+        }
+      }
+    }
+
     const now = Date.now();
     return await ctx.db.insert("practiceSessions", {
       userId,
-      songId: args.songId,
+      date: args.date,
+      durationMinutes: args.durationMinutes,
+      bandId: args.bandId,
       learningProjectId: args.learningProjectId,
-      startTime: args.startTime,
-      endTime: args.endTime,
-      duration: args.duration,
+      songsWorked: args.songsWorked,
       notes: args.notes,
-      focusAreas: args.focusAreas,
-      rating: args.rating,
       createdAt: now,
-      updatedAt: now,
     });
   },
 });
@@ -117,11 +120,12 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("practiceSessions"),
-    endTime: v.optional(v.number()),
-    duration: v.optional(v.number()),
+    date: v.optional(v.string()),
+    durationMinutes: v.optional(v.number()),
+    bandId: v.optional(v.id("bands")),
+    learningProjectId: v.optional(v.id("learningProjects")),
+    songsWorked: v.optional(v.array(v.id("songs"))),
     notes: v.optional(v.string()),
-    focusAreas: v.optional(v.array(v.string())),
-    rating: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -134,10 +138,11 @@ export const update = mutation({
     }
 
     const { id, ...updates } = args;
-    await ctx.db.patch(id, {
-      ...updates,
-      updatedAt: Date.now(),
-    });
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([, v]) => v !== undefined)
+    );
+
+    await ctx.db.patch(id, filteredUpdates);
   },
 });
 
@@ -159,8 +164,8 @@ export const remove = mutation({
 
 export const getStats = query({
   args: {
-    startDate: v.optional(v.number()),
-    endDate: v.optional(v.number()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -174,26 +179,23 @@ export const getStats = query({
 
     // Filter by date range if provided
     if (args.startDate) {
-      sessions = sessions.filter((s) => s.startTime >= args.startDate!);
+      sessions = sessions.filter((s) => s.date >= args.startDate!);
     }
     if (args.endDate) {
-      sessions = sessions.filter((s) => s.startTime <= args.endDate!);
+      sessions = sessions.filter((s) => s.date <= args.endDate!);
     }
 
     const totalSessions = sessions.length;
-    const totalDuration = sessions.reduce((acc, s) => acc + (s.duration || 0), 0);
+    const totalDuration = sessions.reduce(
+      (acc, s) => acc + (s.durationMinutes || 0),
+      0
+    );
     const avgDuration = totalSessions > 0 ? totalDuration / totalSessions : 0;
-    const avgRating =
-      sessions.filter((s) => s.rating).length > 0
-        ? sessions.reduce((acc, s) => acc + (s.rating || 0), 0) /
-          sessions.filter((s) => s.rating).length
-        : 0;
 
     return {
       totalSessions,
       totalDuration,
       avgDuration,
-      avgRating,
     };
   },
 });

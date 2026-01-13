@@ -35,14 +35,10 @@ export const saveSongFile = mutation({
   args: {
     songId: v.id("songs"),
     storageId: v.id("_storage"),
-    fileName: v.string(),
-    fileType: v.union(
-      v.literal("audio"),
-      v.literal("tab"),
-      v.literal("chart"),
-      v.literal("other")
-    ),
-    mimeType: v.string(),
+    fileName: v.optional(v.string()),
+    fileType: v.string(),
+    variantLabel: v.optional(v.string()),
+    mimeType: v.optional(v.string()),
     fileSize: v.number(),
   },
   handler: async (ctx, args) => {
@@ -63,6 +59,12 @@ export const saveSongFile = mutation({
       throw new Error("Song not found");
     }
 
+    // Verify user owns the band this song belongs to
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.userId !== userId) {
+      throw new Error("Not authorized to upload files to this song");
+    }
+
     // Update rate limit
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
     const rateLimit = await ctx.db
@@ -72,6 +74,9 @@ export const saveSongFile = mutation({
 
     if (rateLimit) {
       if (rateLimit.windowStart > oneHourAgo) {
+        if (rateLimit.uploadCount >= MAX_UPLOADS_PER_HOUR) {
+          throw new Error("Upload rate limit exceeded. Try again later.");
+        }
         await ctx.db.patch(rateLimit._id, {
           uploadCount: rateLimit.uploadCount + 1,
         });
@@ -89,16 +94,29 @@ export const saveSongFile = mutation({
       });
     }
 
+    // Get existing files to determine version number
+    const existingFiles = await ctx.db
+      .query("songFiles")
+      .withIndex("by_song", (q) => q.eq("songId", args.songId))
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    const maxVersion = existingFiles.length > 0
+      ? Math.max(...existingFiles.map((f) => f.version))
+      : 0;
+
     const now = Date.now();
     return await ctx.db.insert("songFiles", {
       songId: args.songId,
       storageId: args.storageId,
       fileName: args.fileName,
       fileType: args.fileType,
+      variantLabel: args.variantLabel,
       mimeType: args.mimeType,
       fileSize: args.fileSize,
+      version: maxVersion + 1,
+      isPrimary: existingFiles.length === 0,
       createdAt: now,
-      updatedAt: now,
     });
   },
 });
@@ -108,6 +126,14 @@ export const listBySong = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+    const userId = identity.subject as Id<"users">;
+
+    // Verify user owns the band this song belongs to
+    const song = await ctx.db.get(args.songId);
+    if (!song || song.deletedAt) return [];
+
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.userId !== userId) return [];
 
     return await ctx.db
       .query("songFiles")
@@ -120,6 +146,9 @@ export const listBySong = query({
 export const getFileUrl = query({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
     return await ctx.storage.getUrl(args.storageId);
   },
 });
@@ -129,31 +158,36 @@ export const softDelete = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+    const userId = identity.subject as Id<"users">;
 
     const file = await ctx.db.get(args.id);
     if (!file || file.deletedAt) {
       throw new Error("File not found");
     }
 
+    // Verify user owns the band this song belongs to
+    const song = await ctx.db.get(file.songId);
+    if (!song) {
+      throw new Error("Song not found");
+    }
+
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.userId !== userId) {
+      throw new Error("Not authorized to delete this file");
+    }
+
     await ctx.db.patch(args.id, {
       deletedAt: Date.now(),
-      updatedAt: Date.now(),
     });
   },
 });
 
 export const saveLearningProjectFile = mutation({
   args: {
-    learningProjectId: v.id("learningProjects"),
+    projectId: v.id("learningProjects"),
     storageId: v.id("_storage"),
-    fileName: v.string(),
-    fileType: v.union(
-      v.literal("audio"),
-      v.literal("tab"),
-      v.literal("chart"),
-      v.literal("other")
-    ),
-    mimeType: v.string(),
+    fileName: v.optional(v.string()),
+    fileType: v.string(),
     fileSize: v.number(),
   },
   handler: async (ctx, args) => {
@@ -169,7 +203,7 @@ export const saveLearningProjectFile = mutation({
     }
 
     // Verify learning project exists and belongs to user
-    const project = await ctx.db.get(args.learningProjectId);
+    const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt || project.userId !== userId) {
       throw new Error("Learning project not found");
     }
@@ -205,29 +239,32 @@ export const saveLearningProjectFile = mutation({
 
     const now = Date.now();
     return await ctx.db.insert("learningProjectFiles", {
-      learningProjectId: args.learningProjectId,
+      projectId: args.projectId,
       storageId: args.storageId,
       fileName: args.fileName,
       fileType: args.fileType,
-      mimeType: args.mimeType,
       fileSize: args.fileSize,
       createdAt: now,
-      updatedAt: now,
     });
   },
 });
 
 export const listByLearningProject = query({
-  args: { learningProjectId: v.id("learningProjects") },
+  args: { projectId: v.id("learningProjects") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+    const userId = identity.subject as Id<"users">;
+
+    // Verify user owns this project
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt || project.userId !== userId) {
+      return [];
+    }
 
     return await ctx.db
       .query("learningProjectFiles")
-      .withIndex("by_project", (q) =>
-        q.eq("learningProjectId", args.learningProjectId)
-      )
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
   },
