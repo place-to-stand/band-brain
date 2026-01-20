@@ -122,7 +122,7 @@ components/
 "use client";
 
 import { Component, ReactNode } from "react";
-import * as Sentry from "@sentry/nextjs";
+import posthog from "posthog-js";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -146,8 +146,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    Sentry.captureException(error, {
-      extra: { componentStack: errorInfo.componentStack },
+    posthog.captureException(error, {
+      componentStack: errorInfo.componentStack,
     });
   }
 

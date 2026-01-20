@@ -45,7 +45,7 @@ BandBrain is a collaborative web application designed to help gigging musicians 
 | **Tab Rendering** | AlphaTab | Guitar Pro format support, MIDI playback |
 | **Waveform** | wavesurfer.js | Interactive waveforms |
 | **Audio Synth** | Tone.js | Chord progression player |
-| **Error Tracking** | Sentry | Production error monitoring |
+| **Error Tracking** | PostHog | Analytics and error monitoring |
 
 ---
 
@@ -81,9 +81,9 @@ CONVEX_AUTH_SECRET=your-secret-here
 AUTH_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 AUTH_GOOGLE_CLIENT_SECRET=your-client-secret
 
-# Error Tracking
-NEXT_PUBLIC_SENTRY_DSN=https://xxxxx@sentry.io/xxxxx
-SENTRY_AUTH_TOKEN=xxxxx
+# Analytics & Error Tracking (PostHog)
+NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxx
+NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
 
 # Site URL (for auth callbacks)
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
