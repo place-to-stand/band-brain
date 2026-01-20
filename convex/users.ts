@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Get the current authenticated user
@@ -7,18 +8,12 @@ import { query, mutation, internalMutation } from "./_generated/server";
 export const current = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       return null;
     }
 
-    // Look up user by email from identity
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email ?? ""))
-      .first();
-
-    return user;
+    return await ctx.db.get(userId);
   },
 });
 
@@ -80,26 +75,17 @@ export const updateProfile = mutation({
     imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       throw new Error("Not authenticated");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email ?? ""))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    await ctx.db.patch(user._id, {
+    await ctx.db.patch(userId, {
       ...args,
       updatedAt: Date.now(),
     });
 
-    return user._id;
+    return userId;
   },
 });
 
@@ -109,16 +95,12 @@ export const updateProfile = mutation({
 export const getStorageUsage = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       return null;
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", identity.email ?? ""))
-      .first();
-
+    const user = await ctx.db.get(userId);
     if (!user) {
       return null;
     }

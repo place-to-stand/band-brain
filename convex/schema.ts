@@ -39,12 +39,16 @@ export default defineSchema({
     email: v.string(),
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    // Auth identifier from Convex Auth (used for lookups)
+    tokenIdentifier: v.optional(v.string()),
     // Storage tracking (2GB = 2147483648 bytes limit)
     storageUsedBytes: v.optional(v.number()), // Defaults to 0
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
-  }).index("email", ["email"]),
+  })
+    .index("email", ["email"])
+    .index("by_token", ["tokenIdentifier"]),
 
   // ============ BANDS ============
   bands: defineTable({

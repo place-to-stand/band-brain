@@ -2,7 +2,7 @@
 
 > **How to use:** Check off items as they're completed. Update the "Last Updated" date when making changes.
 >
-> **Last Updated:** January 2026
+> **Last Updated:** January 20, 2026
 
 ---
 
@@ -11,7 +11,7 @@
 | Phase | Status | Items Done | Total |
 |-------|--------|------------|-------|
 | 1. Foundation & Auth | ✅ Complete | 6 | 6 |
-| 2. Bands & Collaboration | ⚪ Not Started | 0 | 4 |
+| 2. Bands & Collaboration | ✅ Complete | 4 | 4 |
 | 3. Songs & Files | ⚪ Not Started | 0 | 6 |
 | 4. Audio Features | ⚪ Not Started | 0 | 4 |
 | 5. Tab Rendering | ⚪ Not Started | 0 | 3 |
@@ -50,13 +50,20 @@
 **Dependencies:** Phase 1 (need auth and users)
 **Spec:** [SCHEMA.md](./SCHEMA.md)
 
-- [ ] Band CRUD with soft deletes
-- [ ] Band membership model
-- [ ] Shareable invite codes for joining bands
-- [ ] Band member list view
+- [x] Band CRUD with soft deletes
+- [x] Band membership model
+- [x] Shareable invite codes for joining bands
+- [x] Band member list view
 
 **Notes:**
-<!-- Add implementation notes here -->
+- Created `convex/bands.ts` with queries (listMyBands, get, getByInviteCode) and mutations (create, update, softDelete, regenerateInviteCode)
+- Created `convex/bandMemberships.ts` with queries (listByBand, getMyMembership) and mutations (join, leave, updateInstruments)
+- 6-character invite codes using safe characters (no 0/O/1/I/L confusion)
+- Users can rejoin bands they previously left (clears `leftAt`, preserves history)
+- Last member cannot leave - must delete band instead
+- Only band creator can delete the band
+- Uses `getAuthUserId` from `@convex-dev/auth/server` for reliable user lookup
+- UI components: BandCard, BandList, CreateBandDialog, JoinBandDialog, InviteCodeDisplay, MemberCard, MemberList, InstrumentPicker, LeaveBandDialog
 
 ---
 
