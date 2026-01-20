@@ -1,0 +1,269 @@
+# BandBrain MVP - Development Progress
+
+> **How to use:** Check off items as they're completed. Update the "Last Updated" date when making changes.
+>
+> **Last Updated:** January 2026
+
+---
+
+## Overall Progress
+
+| Phase | Status | Items Done | Total |
+|-------|--------|------------|-------|
+| 1. Foundation & Auth | 🟡 In Progress | 1 | 6 |
+| 2. Bands & Collaboration | ⚪ Not Started | 0 | 4 |
+| 3. Songs & Files | ⚪ Not Started | 0 | 6 |
+| 4. Audio Features | ⚪ Not Started | 0 | 4 |
+| 5. Tab Rendering | ⚪ Not Started | 0 | 3 |
+| 6. Gear Settings | ⚪ Not Started | 0 | 5 |
+| 7. Training Tools | ⚪ Not Started | 0 | 5 |
+| 8. Recording Projects | ⚪ Not Started | 0 | 5 |
+| 9. Setlists | ⚪ Not Started | 0 | 4 |
+| 10. Practice & Export | ⚪ Not Started | 0 | 3 |
+| 11. Polish | ⚪ Not Started | 0 | 4 |
+
+**Legend:** ✅ Complete | 🟡 In Progress | ⚪ Not Started
+
+---
+
+## Phase 1: Foundation & Auth
+**Dependencies:** None (starting point)
+**Spec:** [AUTH.md](./AUTH.md)
+
+- [x] Project setup (Next.js, Convex, Tailwind, shadcn/ui)
+- [ ] Google OAuth authentication via Convex Auth
+- [ ] User model with storage tracking
+- [ ] Basic error boundary
+- [ ] Sentry integration
+- [ ] Responsive layout shell (mobile + desktop)
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 2: Bands & Collaboration
+**Dependencies:** Phase 1 (need auth and users)
+**Spec:** [SCHEMA.md](./SCHEMA.md)
+
+- [ ] Band CRUD with soft deletes
+- [ ] Band membership model
+- [ ] Shareable invite codes for joining bands
+- [ ] Band member list view
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 3: Songs & Files
+**Dependencies:** Phase 2 (songs belong to bands)
+**Spec:** [SCHEMA.md](./SCHEMA.md), [FILES.md](./FILES.md)
+
+- [ ] Song CRUD with 4-level practice status (new → learning → solid → performance_ready)
+- [ ] File upload with size validation (100MB max)
+- [ ] Per-user storage quota tracking (2GB limit)
+- [ ] Upload rate limiting (50/hour)
+- [ ] External URL support (Dropbox, YouTube, Bandcamp, Google Drive)
+- [ ] Song sections structure
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 4: Audio Features
+**Dependencies:** Phase 3 (need uploaded files)
+**Spec:** [FILES.md](./FILES.md)
+
+- [ ] Waveform pre-computation on audio upload
+- [ ] wavesurfer.js integration for audio playback
+- [ ] Essentia.js audio analysis (tempo/key detection as defaults)
+- [ ] Song duration detection
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 5: Tab Rendering
+**Dependencies:** Phase 3 (need file uploads for .gp files)
+**Spec:** [UI.md](./UI.md)
+
+- [ ] AlphaTab lazy loading
+- [ ] Guitar Pro file rendering (.gp, .gpx, .gp5)
+- [ ] MIDI playback from tabs
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 6: Gear Settings
+**Dependencies:** Phase 3 (gear settings attach to song sections)
+**Spec:** [GEAR.md](./GEAR.md)
+
+- [ ] User-defined gear pieces (pedals, synths, amps)
+- [ ] Visual knob dial UI (position-based, 7-5 o'clock style)
+- [ ] Editable knob labels
+- [ ] Synth patch storage with override tracking
+- [ ] Per-section gear configurations
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 7: Training Tools
+**Dependencies:** Phase 3 (metronome links to songs)
+**Spec:** [TRAINING.md](./TRAINING.md)
+
+- [ ] Metronome with song linking (auto-configure from song tempo/time)
+- [ ] Drone player (auto-configure from song key)
+- [ ] Chord progression player
+- [ ] Preset drum beats under chord progressions (rock, pop, jazz, shuffle, ballad)
+- [ ] Drum sample upload support
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 8: Recording Projects
+**Dependencies:** Phase 3 (recording projects reference songs)
+**Spec:** [RECORDING.md](./RECORDING.md)
+
+- [ ] Recording project CRUD
+- [ ] Recording songs within projects
+- [ ] Tracking grid (instrument × song status matrix)
+- [ ] Bounce uploads with waveform
+- [ ] Timestamped comments on bounces
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 9: Setlists
+**Dependencies:** Phase 6 (need gear settings for deltas)
+**Spec:** [SETLISTS.md](./SETLISTS.md)
+
+- [ ] Setlist CRUD with duration calculation
+- [ ] Starting gear settings (pre-show state)
+- [ ] Computed gear deltas between songs
+- [ ] Transition notes between songs
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 10: Practice & Export
+**Dependencies:** Phase 3 (practice logs reference songs)
+**Spec:** [SCHEMA.md](./SCHEMA.md)
+
+- [ ] Practice session logging (date, duration, songs, notes)
+- [ ] Data export (full JSON dump)
+- [ ] Storage usage display
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Phase 11: Polish
+**Dependencies:** All features complete
+
+- [ ] Performance optimization
+- [ ] Mobile responsiveness refinement
+- [ ] Manual testing of all flows
+- [ ] Bug fixes
+
+**Notes:**
+<!-- Add implementation notes here -->
+
+---
+
+## Manual Testing Checklist
+
+> Complete this checklist before considering MVP ready for launch.
+
+### Authentication
+- [ ] Sign in with Google (new user creates account)
+- [ ] Sign in with Google (existing user)
+- [ ] Sign out
+- [ ] Redirect to sign-in when accessing protected routes
+
+### Bands & Collaboration
+- [ ] Create a new band
+- [ ] Generate and share invite code
+- [ ] Join band via invite code (different user)
+- [ ] View band member list
+- [ ] Leave a band
+
+### Songs & Files
+- [ ] Create song with all fields
+- [ ] Update practice status (new → learning → solid → performance_ready)
+- [ ] Upload audio file (verify waveform generates)
+- [ ] Upload Guitar Pro file (verify tab renders)
+- [ ] Add external URL (Dropbox, YouTube)
+- [ ] Delete song (soft delete)
+- [ ] Verify storage quota displays correctly
+
+### Gear Settings
+- [ ] Add gear piece (pedal/synth/amp)
+- [ ] Add custom knobs to gear piece
+- [ ] Adjust knob positions (visual dial)
+- [ ] Edit knob labels
+- [ ] Create song sections with different gear
+
+### Training Tools
+- [ ] Metronome: Set BPM, time signature, play/stop
+- [ ] Metronome: Link to song (auto-configure)
+- [ ] Drone player: Set key, play/stop
+- [ ] Chord prog player: Enter chords, set bars
+- [ ] Chord prog player: Enable drum beat, select style
+
+### Recording Projects
+- [ ] Create recording project
+- [ ] Add songs to project
+- [ ] Update tracking grid status
+- [ ] Upload bounce
+- [ ] Add timestamped comment on bounce
+
+### Setlists
+- [ ] Create setlist
+- [ ] Add songs to setlist
+- [ ] Reorder songs
+- [ ] View computed gear deltas
+- [ ] Verify duration calculation
+
+### Mobile Responsiveness
+- [ ] Test all above flows on mobile viewport
+- [ ] Verify touch interactions work (knob dials, drag-drop)
+
+---
+
+## Blockers & Issues
+
+> Document any blockers or issues encountered during development.
+
+| Date | Issue | Status | Resolution |
+|------|-------|--------|------------|
+| | | | |
+
+---
+
+## Session Notes
+
+> Add notes at the end of each development session to help resume context.
+
+### Session: [DATE]
+**What was done:**
+-
+
+**Next steps:**
+-
+
+**Context to remember:**
+-
