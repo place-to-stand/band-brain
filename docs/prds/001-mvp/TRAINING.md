@@ -1,17 +1,20 @@
 # Training Tools
 
-> **Related:** [PROGRESS.md](./PROGRESS.md) | [SCHEMA.md](./SCHEMA.md)
+> **Related:** [PROGRESS.md](./PROGRESS.md) | [SCHEMA.md](./SCHEMA.md) | [FUTURE_CONSIDERATIONS.md](./FUTURE_CONSIDERATIONS.md)
 
 ## Overview
 
 Training tools help musicians practice with:
 - **Metronome** - Click track synced to song tempo/time signature
-- **Drone Player** - Sustained root note/chord for scale practice
-- **Chord Progression Player** - Backing chords with drum beats
+- **Drone Player** - Sustained root note for scale/mode practice
+
+> **Note:** Chord progression player and drum beats are deferred to a future phase. See [FUTURE_CONSIDERATIONS.md](./FUTURE_CONSIDERATIONS.md).
 
 ---
 
 ## Song-Linked Practice Settings
+
+When practicing a song, the training tools can auto-configure from the song's metadata:
 
 ```typescript
 // convex/songs.ts
@@ -46,6 +49,18 @@ export const getPracticeSettings = query({
 ---
 
 ## Metronome
+
+A visual metronome with tempo control, time signature selection, and beat indicators.
+
+### Features
+- BPM slider (40-240 range)
+- Time signature selection (3/4, 4/4, 5/4, 6/8, 7/8)
+- Visual beat indicators (circles light up on each beat)
+- Accented downbeat (higher pitch on beat 1)
+- Play/Stop toggle
+- Auto-configure from song tempo/time signature
+
+### Implementation
 
 ```typescript
 // components/training/Metronome.tsx
@@ -168,6 +183,18 @@ export function Metronome({
 
 ## Drone Player
 
+A sustained tone generator for practicing scales, modes, and ear training.
+
+### Features
+- Note selection (C through B, including sharps)
+- Octave selection (1, 2, 3 - bass range for grounding)
+- Sine wave oscillator (clean, no harmonics)
+- Smooth attack/release for pleasant sound
+- Live note change while playing
+- Auto-configure from song key
+
+### Implementation
+
 ```typescript
 // components/training/DronePlayer.tsx
 "use client";
@@ -222,6 +249,13 @@ export function DronePlayer({
     }
   };
 
+  const handleOctaveChange = (newOctave: number) => {
+    setOctave(newOctave);
+    if (isPlaying) {
+      synthRef.current?.setNote(`${note}${newOctave}`);
+    }
+  };
+
   return (
     <div className="space-y-4 p-4 border rounded-lg">
       <div className="flex items-center justify-between">
@@ -248,7 +282,7 @@ export function DronePlayer({
         </Button>
         <select
           value={octave}
-          onChange={(e) => setOctave(Number(e.target.value))}
+          onChange={(e) => handleOctaveChange(Number(e.target.value))}
           className="border rounded px-2"
         >
           <option value={1}>Octave 1</option>
@@ -263,133 +297,42 @@ export function DronePlayer({
 
 ---
 
-## Chord Progression Player with Drums
+## Training Page Layout
 
-### Preset Drum Styles
-
-| Style | Description |
-|-------|-------------|
-| **Rock** | Kick on 1 & 3, snare on 2 & 4, 8th note hi-hat |
-| **Pop** | Lighter rock variant with syncopated kick |
-| **Jazz** | Swing pattern with ride cymbal |
-| **Shuffle** | Triplet-feel blues shuffle |
-| **Ballad** | Sparse, slow pattern |
-
-### Implementation
+The training page provides both tools in a clean layout:
 
 ```typescript
-// components/training/ChordProgressionPlayer.tsx
+// app/(dashboard)/training/page.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import * as Tone from "tone";
+import { Metronome } from "@/components/training/Metronome";
+import { DronePlayer } from "@/components/training/DronePlayer";
 
-interface Chord {
-  name: string; // e.g., "Am", "G", "F"
-  bars: number; // Number of bars to hold this chord
-}
-
-type DrumStyle = "rock" | "pop" | "jazz" | "shuffle" | "ballad";
-
-const DRUM_PATTERNS: Record<DrumStyle, { kick: number[]; snare: number[]; hihat: number[] }> = {
-  rock: {
-    kick: [0, 2],
-    snare: [1, 3],
-    hihat: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
-  },
-  pop: {
-    kick: [0, 2.5],
-    snare: [1, 3],
-    hihat: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
-  },
-  jazz: {
-    kick: [0, 2.5],
-    snare: [1.67, 3.67],
-    hihat: [0, 1, 2, 3],
-  },
-  shuffle: {
-    kick: [0, 2],
-    snare: [1, 3],
-    hihat: [0, 0.67, 1, 1.67, 2, 2.67, 3, 3.67],
-  },
-  ballad: {
-    kick: [0],
-    snare: [2],
-    hihat: [0, 1, 2, 3],
-  },
-};
-
-export function ChordProgressionPlayer() {
-  const [chords, setChords] = useState<Chord[]>([
-    { name: "Am", bars: 1 },
-    { name: "G", bars: 1 },
-    { name: "F", bars: 1 },
-    { name: "E", bars: 1 },
-  ]);
-  const [bpm, setBpm] = useState(120);
-  const [drumStyle, setDrumStyle] = useState<DrumStyle>("rock");
-  const [drumsEnabled, setDrumsEnabled] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const chordSynthRef = useRef<Tone.PolySynth | null>(null);
-  const drumSamplerRef = useRef<Tone.Sampler | null>(null);
-
-  useEffect(() => {
-    // Chord synth (pad sound)
-    chordSynthRef.current = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.5, decay: 0.1, sustain: 0.8, release: 1 },
-    }).toDestination();
-
-    // Drum sampler
-    drumSamplerRef.current = new Tone.Sampler({
-      C2: "/samples/drums/kick.wav",
-      D2: "/samples/drums/snare.wav",
-      "F#2": "/samples/drums/hihat.wav",
-    }).toDestination();
-
-    return () => {
-      chordSynthRef.current?.dispose();
-      drumSamplerRef.current?.dispose();
-    };
-  }, []);
-
-  const play = async () => {
-    await Tone.start();
-    Tone.Transport.bpm.value = bpm;
-    // Schedule chords and drums...
-    Tone.Transport.start();
-    setIsPlaying(true);
-  };
-
-  const stop = () => {
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
-    setIsPlaying(false);
-  };
-
+export default function TrainingPage() {
   return (
-    <div className="space-y-4 p-4 border rounded-lg">
-      <h3 className="font-semibold">Chord Progression</h3>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Training Tools</h1>
 
-      {/* Chord list editor */}
-      {/* BPM slider */}
-      {/* Drum style selector */}
-      {/* Drums toggle */}
-      {/* Play/Stop button */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Metronome />
+        <DronePlayer />
+      </div>
+
+      {/* Future: Song selector for auto-configuration */}
     </div>
   );
 }
 ```
 
-### Drum Sample Requirements
+---
 
-Users can upload their own drum samples:
+## Future Enhancements (Deferred)
 
-| Sample | Purpose |
-|--------|---------|
-| `kick.wav` | Bass drum / kick |
-| `snare.wav` | Snare drum |
-| `hihat.wav` | Closed hi-hat |
+The following features are planned for future phases:
 
-Default samples provided in `/public/samples/drums/`.
+1. **Chord Progression Player** - Enter chord progressions, play synthesized backing
+2. **Drum Beats** - Preset patterns (rock, pop, jazz, shuffle, ballad)
+3. **Licks Database** - Curated and AI-generated licks for practice
+4. **Custom Drum Samples** - Upload your own drum sounds
+
+See [FUTURE_CONSIDERATIONS.md](./FUTURE_CONSIDERATIONS.md) for details.

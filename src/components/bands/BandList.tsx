@@ -6,8 +6,6 @@ import { Id } from "../../../convex/_generated/dataModel";
 interface Band {
   _id: Id<"bands">;
   name: string;
-  memberCount: number;
-  myInstruments: string[];
   createdAt: number;
 }
 

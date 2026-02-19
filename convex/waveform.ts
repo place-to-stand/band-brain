@@ -40,21 +40,19 @@ export const saveSongFileAnalysis = mutation({
       throw new Error("File not found");
     }
 
-    // Verify access via song membership
+    // Verify access via song ownership
     const song = await ctx.db.get(file.songId);
     if (!song || song.deletedAt) {
       throw new Error("Song not found");
     }
 
-    const membership = await ctx.db
-      .query("bandMemberships")
-      .withIndex("by_band_user", (q) =>
-        q.eq("bandId", song.bandId).eq("userId", userId)
-      )
-      .first();
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.deletedAt) {
+      throw new Error("Band not found");
+    }
 
-    if (!membership || membership.leftAt) {
-      throw new Error("Not a member of this band");
+    if (band.createdBy !== userId) {
+      throw new Error("Not authorized to access this song");
     }
 
     // Update the file with waveform and analysis data
@@ -155,16 +153,14 @@ export const applySongMetadata = mutation({
       throw new Error("Song not found");
     }
 
-    // Verify access via song membership
-    const membership = await ctx.db
-      .query("bandMemberships")
-      .withIndex("by_band_user", (q) =>
-        q.eq("bandId", song.bandId).eq("userId", userId)
-      )
-      .first();
+    // Verify access via band ownership
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.deletedAt) {
+      throw new Error("Band not found");
+    }
 
-    if (!membership || membership.leftAt) {
-      throw new Error("Not a member of this band");
+    if (band.createdBy !== userId) {
+      throw new Error("Not authorized to access this song");
     }
 
     // Build updates
@@ -247,15 +243,13 @@ export const updateSongDuration = mutation({
       throw new Error("Song not found");
     }
 
-    const membership = await ctx.db
-      .query("bandMemberships")
-      .withIndex("by_band_user", (q) =>
-        q.eq("bandId", song.bandId).eq("userId", userId)
-      )
-      .first();
+    const band = await ctx.db.get(song.bandId);
+    if (!band || band.deletedAt) {
+      throw new Error("Band not found");
+    }
 
-    if (!membership || membership.leftAt) {
-      throw new Error("Not a member of this band");
+    if (band.createdBy !== userId) {
+      throw new Error("Not authorized to access this song");
     }
 
     await ctx.db.patch(args.songId, {

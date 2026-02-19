@@ -1,21 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "../../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -23,15 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
-  PracticeStatusBadge,
   SongFilesSection,
+  PracticeStatusDropdown,
   PracticeStatus,
-  PersonalNotesSection,
-  PersonalPracticeStatus,
 } from "@/components/songs";
-import { ArrowLeft, Pencil, Check, X, Trash2, Music } from "lucide-react";
+import { SectionGearManager } from "@/components/gear";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -43,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 const MUSICAL_KEYS = [
   "C", "C#", "Db", "D", "D#", "Eb", "E", "F",
@@ -58,106 +48,192 @@ const TIME_SIGNATURES = [
   "4/4", "3/4", "6/8", "2/4", "5/4", "7/8", "12/8",
 ] as const;
 
+// Inline editable text component - no visual shift between modes
+function InlineEditableText({
+  value,
+  onSave,
+  placeholder,
+  className,
+  inputClassName,
+}: {
+  value: string;
+  onSave: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  inputClassName?: string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [localValue, setLocalValue] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    if (localValue.trim() !== value) {
+      onSave(localValue.trim());
+    }
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <Input
+        ref={inputRef}
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSave();
+          if (e.key === "Escape") {
+            setLocalValue(value);
+            setIsEditing(false);
+          }
+        }}
+        className={cn(
+          "h-auto py-0 px-1 bg-transparent border-transparent focus:border-input",
+          "font-inherit text-inherit leading-inherit",
+          inputClassName
+        )}
+        placeholder={placeholder}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={() => setIsEditing(true)}
+      className={cn(
+        "cursor-text hover:bg-muted/50 rounded px-1 -mx-1 transition-colors inline-block",
+        !value && "text-muted-foreground italic",
+        className
+      )}
+    >
+      {value || placeholder}
+    </span>
+  );
+}
+
+// Inline select component - fixed width container for consistent sizing
+const CLEAR_VALUE = "__none__";
+
+function InlineSelect({
+  value,
+  onSave,
+  options,
+  placeholder,
+  width = "w-16",
+}: {
+  value: string | undefined;
+  onSave: (value: string | undefined) => void;
+  options: readonly string[];
+  placeholder: string;
+  width?: string;
+}) {
+  return (
+    <div className={width}>
+      <Select
+        value={value || CLEAR_VALUE}
+        onValueChange={(v) => onSave(v === CLEAR_VALUE ? undefined : v)}
+      >
+        <SelectTrigger className="h-7 w-full border-0 bg-transparent hover:bg-muted/50 focus:ring-0 px-2">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent className={width}>
+          <SelectItem value={CLEAR_VALUE}>—</SelectItem>
+          {options.map((opt) => (
+            <SelectItem key={opt} value={opt}>
+              {opt}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export default function SongDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bandId = params.bandId as Id<"bands">;
   const songId = params.songId as Id<"songs">;
 
-  const [isEditing, setIsEditing] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
 
-  // Edit form state
-  const [editTitle, setEditTitle] = useState("");
-  const [editKey, setEditKey] = useState("");
-  const [editMode, setEditMode] = useState("");
-  const [editTempo, setEditTempo] = useState("");
-  const [editTimeSignature, setEditTimeSignature] = useState("");
-  const [editNotes, setEditNotes] = useState("");
+  // General notes state (managed separately for debounced saves)
+  const [localNotes, setLocalNotes] = useState<string | null>(null);
+  const notesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const song = useQuery(api.songs.get, { id: songId });
-  const userProgress = useQuery(api.userSongProgress.getForSong, { songId });
   const updateSong = useMutation(api.songs.update);
+  const updatePracticeStatus = useMutation(api.songs.updatePracticeStatus);
   const archiveSong = useMutation(api.songs.softDelete);
 
   const isLoading = song === undefined;
 
-  // User's personal practice status (defaults to "new")
-  const userPracticeStatus = userProgress?.practiceStatus ?? "new";
-
-  // Song not found or no access
-  if (song === null) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Song not found</CardTitle>
-            <CardDescription>
-              This song doesn&apos;t exist or you don&apos;t have access to it.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/bands/${bandId}/songs`)}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Songs
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const startEditing = () => {
-    if (!song) return;
-    setEditTitle(song.title);
-    setEditKey(song.key || "");
-    setEditMode(song.mode || "");
-    setEditTempo(song.tempo?.toString() || "");
-    setEditTimeSignature(song.timeSignature || "");
-    setEditNotes(song.notes || "");
-    setIsEditing(true);
-  };
-
-  const cancelEditing = () => {
-    setIsEditing(false);
-  };
-
-  const handleSave = async () => {
-    if (!editTitle.trim()) {
-      toast.error("Song title is required");
-      return;
+  // Sync local notes with server when song loads
+  useEffect(() => {
+    if (song && localNotes === null) {
+      setLocalNotes(song.notes || "");
     }
+  }, [song, localNotes]);
 
-    const tempoNum = editTempo ? parseInt(editTempo, 10) : undefined;
-    if (editTempo && (isNaN(tempoNum!) || tempoNum! < 1 || tempoNum! > 400)) {
-      toast.error("Tempo must be between 1 and 400 BPM");
-      return;
-    }
+  // Handle field updates with debounce for text fields
+  const handleFieldUpdate = useCallback(
+    async (field: string, value: string | number | undefined) => {
+      try {
+        await updateSong({
+          id: songId,
+          [field]: value,
+        });
+      } catch (err) {
+        toast.error(`Failed to update ${field}`);
+        console.error(err);
+      }
+    },
+    [songId, updateSong]
+  );
 
-    setIsSaving(true);
-    try {
-      await updateSong({
-        id: songId,
-        title: editTitle.trim(),
-        key: editKey || undefined,
-        mode: editMode || undefined,
-        tempo: tempoNum,
-        timeSignature: editTimeSignature || undefined,
-        notes: editNotes.trim() || undefined,
-      });
-      setIsEditing(false);
-      toast.success("Song updated");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update song");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // Handle general notes change with debounced save
+  const handleGeneralNotesChange = useCallback(
+    (notes: string) => {
+      setLocalNotes(notes);
+
+      if (notesTimeoutRef.current) {
+        clearTimeout(notesTimeoutRef.current);
+      }
+
+      notesTimeoutRef.current = setTimeout(async () => {
+        try {
+          await updateSong({
+            id: songId,
+            notes: notes.trim(),
+          });
+        } catch (err) {
+          console.error("Failed to save notes:", err);
+        }
+      }, 1000);
+    },
+    [songId, updateSong]
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (notesTimeoutRef.current) {
+        clearTimeout(notesTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleArchive = async () => {
     setIsArchiving(true);
@@ -172,296 +248,142 @@ export default function SongDetailPage() {
     }
   };
 
+  const handleStatusChange = async (newStatus: PracticeStatus) => {
+    try {
+      await updatePracticeStatus({ id: songId, practiceStatus: newStatus });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update status");
+    }
+  };
+
+  // Song not found
+  if (song === null) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-muted-foreground mb-4">Song not found</p>
+        <Button variant="outline" onClick={() => router.push(`/bands/${bandId}/songs`)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Songs
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      {/* Header - Title, Status, Key Info */}
+      <div className="space-y-3">
+        {/* Back button and actions */}
+        <div className="flex items-center justify-between">
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
             onClick={() => router.push(`/bands/${bandId}/songs`)}
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">
-                {isLoading ? (
-                  <span className="animate-pulse bg-muted rounded h-7 w-48 inline-block" />
-                ) : (
-                  song?.title
-                )}
-              </h1>
-              {!isLoading && song && (
-                <PracticeStatusBadge
-                  status={userPracticeStatus as PracticeStatus}
-                />
-              )}
-            </div>
-            <p className="text-muted-foreground">
-              {isLoading ? (
-                <span className="animate-pulse bg-muted rounded h-4 w-24 inline-block" />
-              ) : (
-                song?.bandName
-              )}
-            </p>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowArchiveDialog(true)}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
-        {!isLoading && (
-          <div className="flex gap-2">
-            {!isEditing ? (
-              <>
-                <Button variant="outline" onClick={startEditing}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowArchiveDialog(true)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Archive
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={cancelEditing}
-                  disabled={isSaving}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  <Check className="mr-2 h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save"}
-                </Button>
-              </>
+
+        {/* Title row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {isLoading ? (
+            <div className="h-9 w-64 bg-muted rounded animate-pulse" />
+          ) : (
+            <h1 className="text-3xl font-bold tracking-tight">
+              <InlineEditableText
+                value={song?.title || ""}
+                onSave={(value) => handleFieldUpdate("title", value)}
+                placeholder="Song title"
+                inputClassName="text-3xl font-bold"
+              />
+            </h1>
+          )}
+          {!isLoading && song && (
+            <PracticeStatusDropdown
+              status={song.practiceStatus as PracticeStatus}
+              onStatusChange={handleStatusChange}
+            />
+          )}
+        </div>
+
+        {/* Musical info bar - inline editable */}
+        {!isLoading && song && (
+          <div className="flex items-center gap-4 text-sm flex-wrap">
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground">Key:</span>
+              <InlineSelect
+                value={song.key}
+                onSave={(v) => handleFieldUpdate("key", v)}
+                options={MUSICAL_KEYS}
+                placeholder="—"
+                width="w-14"
+              />
+              <InlineSelect
+                value={song.mode}
+                onSave={(v) => handleFieldUpdate("mode", v)}
+                options={MODES}
+                placeholder="mode"
+                width="w-24"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground">Tempo:</span>
+              <InlineEditableText
+                value={song.tempo?.toString() || ""}
+                onSave={(v) => {
+                  const num = parseInt(v, 10);
+                  handleFieldUpdate("tempo", isNaN(num) ? undefined : num);
+                }}
+                placeholder="—"
+                className="w-10 text-center tabular-nums"
+                inputClassName="w-10 text-center tabular-nums"
+              />
+              <span className="text-muted-foreground">BPM</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground">Time:</span>
+              <InlineSelect
+                value={song.timeSignature}
+                onSave={(v) => handleFieldUpdate("timeSignature", v)}
+                options={TIME_SIGNATURES}
+                placeholder="—"
+                width="w-16"
+              />
+            </div>
+            {song.durationSeconds && (
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <span>
+                  {Math.floor(song.durationSeconds / 60)}:{String(song.durationSeconds % 60).padStart(2, "0")}
+                </span>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Song Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Music className="h-5 w-5" />
-                Song Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="h-4 bg-muted rounded w-20 animate-pulse" />
-                      <div className="h-10 bg-muted rounded animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              ) : isEditing ? (
-                <div className="space-y-4">
-                  {/* Title */}
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-title">Title *</Label>
-                    <Input
-                      id="edit-title"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      disabled={isSaving}
-                    />
-                  </div>
+      {/* Performance Notes and Files - Side by side */}
+      {!isLoading && song && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Performance Notes */}
+          <SectionGearManager
+            songId={songId}
+            generalNotes={localNotes ?? song.notes ?? ""}
+            onGeneralNotesChange={handleGeneralNotesChange}
+          />
 
-                  {/* Key and Mode */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-key">Key</Label>
-                      <Select
-                        value={editKey || undefined}
-                        onValueChange={setEditKey}
-                        disabled={isSaving}
-                      >
-                        <SelectTrigger id="edit-key">
-                          <SelectValue placeholder="Select key" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MUSICAL_KEYS.map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {k}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-mode">Mode</Label>
-                      <Select
-                        value={editMode || undefined}
-                        onValueChange={setEditMode}
-                        disabled={isSaving}
-                      >
-                        <SelectTrigger id="edit-mode">
-                          <SelectValue placeholder="Select mode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MODES.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Tempo and Time Signature */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-tempo">Tempo (BPM)</Label>
-                      <Input
-                        id="edit-tempo"
-                        type="number"
-                        min={1}
-                        max={400}
-                        value={editTempo}
-                        onChange={(e) => setEditTempo(e.target.value)}
-                        disabled={isSaving}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-time">Time Signature</Label>
-                      <Select
-                        value={editTimeSignature || undefined}
-                        onValueChange={setEditTimeSignature}
-                        disabled={isSaving}
-                      >
-                        <SelectTrigger id="edit-time">
-                          <SelectValue placeholder="Select time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIME_SIGNATURES.map((ts) => (
-                            <SelectItem key={ts} value={ts}>
-                              {ts}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-notes">Band Notes</Label>
-                    <Textarea
-                      id="edit-notes"
-                      value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
-                      disabled={isSaving}
-                      rows={4}
-                      placeholder="Shared notes visible to all band members..."
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Display mode */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Key</p>
-                      <p className="font-medium">
-                        {song?.key
-                          ? `${song.key}${song.mode ? ` ${song.mode}` : ""}`
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Tempo</p>
-                      <p className="font-medium">
-                        {song?.tempo ? `${song.tempo} BPM` : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Time Signature
-                      </p>
-                      <p className="font-medium">{song?.timeSignature || "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Duration</p>
-                      <p className="font-medium">
-                        {song?.durationSeconds
-                          ? `${Math.floor(song.durationSeconds / 60)}:${String(
-                              song.durationSeconds % 60
-                            ).padStart(2, "0")}`
-                          : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  {song?.notes && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">
-                          Band Notes
-                        </p>
-                        <p className="whitespace-pre-wrap">{song.notes}</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Files Section */}
-          {!isLoading && song && <SongFilesSection songId={songId} />}
+          {/* Files */}
+          <SongFilesSection songId={songId} />
         </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Personal Practice Status */}
-          {!isLoading && <PersonalPracticeStatus songId={songId} />}
-
-          {/* Personal Notes */}
-          {!isLoading && <PersonalNotesSection songId={songId} />}
-
-          {/* Quick Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Info</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-2">
-              {isLoading ? (
-                <>
-                  <div className="h-4 bg-muted rounded animate-pulse" />
-                  <div className="h-4 bg-muted rounded animate-pulse" />
-                </>
-              ) : (
-                <>
-                  <p>
-                    Added{" "}
-                    {song?.createdAt
-                      ? new Date(song.createdAt).toLocaleDateString()
-                      : "—"}
-                  </p>
-                  {song?.updatedAt && (
-                    <p>
-                      Updated {new Date(song.updatedAt).toLocaleDateString()}
-                    </p>
-                  )}
-                  <p>{song?.files?.length ?? 0} files attached</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      )}
 
       {/* Archive confirmation dialog */}
       <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
@@ -470,8 +392,7 @@ export default function SongDetailPage() {
             <AlertDialogTitle>Archive Song</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to archive &quot;{song?.title}&quot;? The
-              song and its files will be moved to the archive and can be
-              restored later.
+              song and its files will be moved to the archive.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

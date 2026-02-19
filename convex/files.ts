@@ -50,7 +50,7 @@ async function getQueryUserId(ctx: QueryCtx): Promise<Id<"users"> | null> {
 }
 
 /**
- * Verify user is a member of the band that owns the song
+ * Verify user owns the band that owns the song
  */
 async function verifySongAccess(
   ctx: QueryCtx | MutationCtx,
@@ -62,15 +62,13 @@ async function verifySongAccess(
     throw new Error("Song not found");
   }
 
-  const membership = await ctx.db
-    .query("bandMemberships")
-    .withIndex("by_band_user", (q) =>
-      q.eq("bandId", song.bandId).eq("userId", userId)
-    )
-    .first();
+  const band = await ctx.db.get(song.bandId);
+  if (!band || band.deletedAt) {
+    throw new Error("Band not found");
+  }
 
-  if (!membership || membership.leftAt) {
-    throw new Error("Not a member of this band");
+  if (band.createdBy !== userId) {
+    throw new Error("Not authorized to access this song");
   }
 
   return { song, bandId: song.bandId };

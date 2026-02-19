@@ -29,13 +29,9 @@ interface SongCardProps {
     hasChart: boolean;
     hasTab: boolean;
   };
-  /** User's personal practice status (overrides song.practiceStatus) */
-  userPracticeStatus?: string;
 }
 
-export function SongCard({ song, userPracticeStatus }: SongCardProps) {
-  // Use user's personal practice status if available, otherwise default to "new"
-  const displayStatus = userPracticeStatus ?? "new";
+export function SongCard({ song }: SongCardProps) {
   return (
     <Link href={`/bands/${song.bandId}/songs/${song._id}`}>
       <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
@@ -43,7 +39,7 @@ export function SongCard({ song, userPracticeStatus }: SongCardProps) {
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-lg leading-tight">{song.title}</CardTitle>
             <PracticeStatusBadge
-              status={displayStatus as PracticeStatus}
+              status={song.practiceStatus as PracticeStatus}
             />
           </div>
           <CardDescription className="flex flex-wrap items-center gap-2">

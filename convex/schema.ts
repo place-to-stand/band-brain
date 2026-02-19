@@ -51,34 +51,16 @@ export default defineSchema({
     .index("by_token", ["tokenIdentifier"]),
 
   // ============ BANDS ============
+  // In MVP: Bands are personal song collections owned by a single user
+  // No sharing, no invite codes, no memberships
   bands: defineTable({
-    createdBy: v.id("users"), // Original creator
+    createdBy: v.id("users"), // Owner of this band
     name: v.string(),
-    // Shareable invite code (e.g., "ROCK2024" or UUID)
-    inviteCode: v.string(),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
   })
-    .index("by_invite_code", ["inviteCode"])
     .index("by_created_by", ["createdBy"]),
-
-  // ============ BAND MEMBERSHIPS ============
-  // Tracks which users belong to which bands
-  // All members have equal permissions
-  bandMemberships: defineTable({
-    bandId: v.id("bands"),
-    userId: v.id("users"),
-    // Instruments this user plays in this band
-    instruments: v.array(v.string()), // e.g., ["guitar", "synth"]
-    joinedAt: v.number(),
-    // Soft delete (for leaving band)
-    leftAt: v.optional(v.number()),
-  })
-    .index("by_band", ["bandId"])
-    .index("by_user", ["userId"])
-    .index("by_band_user", ["bandId", "userId"])
-    .index("by_band_active", ["bandId", "leftAt"]),
 
   // ============ SONGS ============
   songs: defineTable({
@@ -153,21 +135,6 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
   }).index("by_song", ["songId"]),
-
-  // ============ USER SONG PROGRESS ============
-  // Per-user practice status and personal notes for songs
-  // Separates personal progress from shared band song data
-  userSongProgress: defineTable({
-    userId: v.id("users"),
-    songId: v.id("songs"),
-    practiceStatus: v.string(), // 'new' | 'learning' | 'solid' | 'performance_ready'
-    personalNotes: v.optional(v.string()),
-    createdAt: v.number(),
-    updatedAt: v.optional(v.number()),
-  })
-    .index("by_user", ["userId"])
-    .index("by_song", ["songId"])
-    .index("by_user_song", ["userId", "songId"]),
 
   // ============ RECORDING PROJECTS ============
   recordingProjects: defineTable({

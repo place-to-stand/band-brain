@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { InstrumentPicker } from "./InstrumentPicker";
 
 interface CreateBandDialogProps {
   open: boolean;
@@ -28,7 +27,6 @@ export function CreateBandDialog({
   onSuccess,
 }: CreateBandDialogProps) {
   const [name, setName] = useState("");
-  const [instruments, setInstruments] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,9 +44,8 @@ export function CreateBandDialog({
     setIsSubmitting(true);
 
     try {
-      await createBand({ name: name.trim(), instruments });
+      await createBand({ name: name.trim() });
       setName("");
-      setInstruments([]);
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
@@ -61,7 +58,6 @@ export function CreateBandDialog({
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setName("");
-      setInstruments([]);
       setError(null);
     }
     onOpenChange(newOpen);
@@ -74,7 +70,8 @@ export function CreateBandDialog({
           <DialogHeader>
             <DialogTitle>Create a Band</DialogTitle>
             <DialogDescription>
-              Create a new band and invite others to join with a shareable code.
+              Create a new band to organize your songs, setlists, and gear
+              settings.
             </DialogDescription>
           </DialogHeader>
 
@@ -90,12 +87,6 @@ export function CreateBandDialog({
                 autoFocus
               />
             </div>
-
-            <InstrumentPicker
-              value={instruments}
-              onChange={setInstruments}
-              disabled={isSubmitting}
-            />
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

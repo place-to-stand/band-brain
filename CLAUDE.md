@@ -38,10 +38,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Auth**: Convex Auth with Password provider
 - **Storage**: Convex Storage (built-in file storage)
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **Tab Rendering**: AlphaTab (lazy loaded)
 - **Waveform**: wavesurfer.js
 - **Analytics & Monitoring**: PostHog (client and server-side)
-- **AI Services**: Vercel AI Gateway
 - **Testing**: Vitest + Playwright
 - **Deployment**: Vercel (Next.js) + Convex Cloud (backend)
 
@@ -54,7 +52,7 @@ app/
 │   ├── learning/     # Personal learning projects
 │   ├── recording/    # Recording project management
 │   ├── setlists/     # Setlist builder
-│   ├── training/     # Practice tools (metronome, drone, licks)
+│   ├── training/     # Practice tools (metronome, drone)
 │   ├── practice-log/ # Practice session history
 │   └── settings/     # User settings, data export
 └── api/              # API routes (if needed)
@@ -64,12 +62,10 @@ app/
 
 **Core tables** (`convex/schema.ts`):
 - `users` - User accounts
-- `bands` - Bands with member info and instruments
+- `bands` - Personal song collections (single-user ownership, no sharing)
 - `songs` - Songs with key, tempo, time signature, practice status
-- `songFiles` - File attachments for songs (audio, tabs, charts)
-- `instrumentParts` - Per-instrument settings and notes for songs
-- `learningProjects` - Personal repertoire/exercises
-- `learningProjectFiles` - Files for learning projects
+- `songFiles` - File attachments for songs (audio, charts)
+- `songSections` - Sections within songs with gear settings
 - `recordingProjects` - Recording session management
 - `recordingSongs` - Songs within recording projects
 - `trackingGrid` - Instrument tracking status per song
@@ -78,10 +74,7 @@ app/
 - `setlists` - Setlists with duration calculation
 - `setlistItems` - Songs in setlists with gear snapshots
 - `practiceSessions` - Practice session logs
-- `licks` - Lick database (curated, user, AI-generated)
-- `dailyLickHistory` - Tracks shown daily licks
 - `uploadRateLimits` - Rate limiting for file uploads
-- `aiGenerationLimits` - Rate limiting for AI lick generation
 
 **Key patterns:**
 - Soft deletes via `deletedAt` timestamps on all core tables
@@ -105,16 +98,15 @@ convex/
 ├── auth.ts           # Convex Auth configuration
 ├── auth.config.ts    # Auth provider config
 ├── users.ts          # User queries/mutations
-├── bands.ts          # Band operations
+├── bands.ts          # Band operations (single-user ownership)
 ├── songs.ts          # Song CRUD
+├── songSections.ts   # Song section management with gear settings
 ├── files.ts          # File upload/management
 ├── waveform.ts       # Waveform computation
-├── learningProjects.ts
 ├── recordingProjects.ts
 ├── bounces.ts
 ├── setlists.ts
 ├── practiceSessions.ts
-├── licks.ts          # Daily lick & AI generation
 ├── export.ts         # Data export
 └── http.ts           # HTTP endpoints (if needed)
 ```
@@ -221,7 +213,6 @@ if (rateLimit.uploadCount >= MAX_UPLOADS_PER_HOUR) {
 **Component library:**
 - shadcn/ui components in `components/ui/`
 - Custom components organized by feature in `components/`
-- AlphaTab viewer: lazy loaded, only imports when needed
 - wavesurfer.js: for audio waveform visualization
 
 **Form handling:**
@@ -230,9 +221,9 @@ if (rateLimit.uploadCount >= MAX_UPLOADS_PER_HOUR) {
 
 **Key custom components:**
 - `components/audio/WaveformPlayer.tsx` - Audio playback with waveform
-- `components/tab/AlphaTabViewer.tsx` - Guitar Pro/alphaTex rendering
 - `components/training/Metronome.tsx` - Metronome with song linking
 - `components/training/DronePlayer.tsx` - Drone/backing track player
+- `components/gear/SectionGearManager.tsx` - Per-section gear settings
 - `components/recording/TrackingGrid.tsx` - Recording status grid
 - `components/ErrorBoundary.tsx` - Global error boundary
 
@@ -255,7 +246,6 @@ if (rateLimit.uploadCount >= MAX_UPLOADS_PER_HOUR) {
 **Practice tools:**
 - Metronome auto-configures from song tempo/time signature
 - Drone player auto-configures from song key/mode
-- Daily lick system with curated and AI-generated options
 
 ### Key Patterns & Conventions
 
@@ -275,7 +265,7 @@ if (rateLimit.uploadCount >= MAX_UPLOADS_PER_HOUR) {
 - Allows schema evolution without breaking existing data
 
 **Lazy loading:**
-- AlphaTab only imported on pages that need tab rendering
+- Heavy libraries loaded only when needed
 - Keeps initial bundle size small
 
 **Type safety:**
@@ -373,9 +363,9 @@ See `AGENTS.md` for comprehensive development practices including:
 - Return user-friendly error messages
 
 **Performance:**
-- Lazy load heavy libraries (AlphaTab)
 - Pre-compute waveform peaks on upload
 - Use Convex indexes for query optimization
+- Bundle splitting for heavy libraries
 
 ## Environment Variables
 

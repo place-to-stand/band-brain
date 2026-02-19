@@ -32,6 +32,7 @@ import {
   ChevronDown,
   ChevronUp,
   Archive,
+  FileAudio,
 } from "lucide-react";
 import { FileUploadDropzone, FileTypeIcon, FileUploadDropzoneRef, MetadataUpdateInfo } from "./FileUploadDropzone";
 import { ExternalUrlDialog } from "./ExternalUrlDialog";
@@ -45,6 +46,7 @@ import { toast } from "sonner";
 
 interface SongFilesSectionProps {
   songId: Id<"songs">;
+  compact?: boolean;
 }
 
 // File type display labels
@@ -77,7 +79,7 @@ interface EditableFile {
   fileType: string;
 }
 
-export function SongFilesSection({ songId }: SongFilesSectionProps) {
+export function SongFilesSection({ songId, compact = false }: SongFilesSectionProps) {
   const [showExternalDialog, setShowExternalDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingFile, setEditingFile] = useState<EditableFile | null>(null);
@@ -280,7 +282,10 @@ export function SongFilesSection({ songId }: SongFilesSectionProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Files</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileAudio className="h-4 w-4" />
+              Files
+            </CardTitle>
             <CardDescription>
               Audio, video, charts, and tabs for this song
             </CardDescription>

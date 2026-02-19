@@ -1,6 +1,6 @@
 # Database Schema (Convex)
 
-> **Related:** [PROGRESS.md](./PROGRESS.md) | [README.md](./README.md)
+> **Related:** [PROGRESS.md](./PROGRESS.md) | [README.md](./README.md) | [FUTURE_CONSIDERATIONS.md](./FUTURE_CONSIDERATIONS.md)
 
 ## Design Principles
 
@@ -8,7 +8,7 @@
 2. **Timestamps**: `createdAt` and `updatedAt` on all entities
 3. **File Size Tracking**: For storage cost monitoring
 4. **Per-User Storage Limits**: 2GB per user, tracked in users table
-5. **Collaborative Bands**: Multiple users can belong to a band with equal permissions
+5. **Single-User Bands**: Bands are personal song collections owned by creator (no sharing in MVP)
 6. **Section-Level Gear Settings**: Gear configurations are stored per song section, not per song
 7. **Visual Knob Settings**: Gear knobs store position (0-1 range representing dial angle) with editable labels
 8. **External Resource Links**: Support both uploaded files and external URLs (Dropbox, YouTube, etc.)
@@ -65,34 +65,16 @@ export default defineSchema({
   }).index("by_email", ["email"]),
 
   // ============ BANDS ============
+  // In MVP: Bands are personal song collections, owned by a single user
+  // No sharing, no invite codes, no memberships
   bands: defineTable({
-    createdBy: v.id("users"), // Original creator
+    createdBy: v.id("users"), // Owner of this band
     name: v.string(),
-    // Shareable invite code (e.g., "ROCK2024" or UUID)
-    inviteCode: v.string(),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
   })
-    .index("by_invite_code", ["inviteCode"])
     .index("by_created_by", ["createdBy"]),
-
-  // ============ BAND MEMBERSHIPS ============
-  // Tracks which users belong to which bands
-  // All members have equal permissions
-  bandMemberships: defineTable({
-    bandId: v.id("bands"),
-    userId: v.id("users"),
-    // Instruments this user plays in this band
-    instruments: v.array(v.string()), // e.g., ["guitar", "synth"]
-    joinedAt: v.number(),
-    // Soft delete (for leaving band)
-    leftAt: v.optional(v.number()),
-  })
-    .index("by_band", ["bandId"])
-    .index("by_user", ["userId"])
-    .index("by_band_user", ["bandId", "userId"])
-    .index("by_band_active", ["bandId", "leftAt"]),
 
   // ============ SONGS ============
   songs: defineTable({
@@ -147,6 +129,7 @@ export default defineSchema({
     detectedTempo: v.optional(v.number()),
     detectedKey: v.optional(v.string()),
     analysisConfidence: v.optional(v.number()),
+    durationSeconds: v.optional(v.number()), // Detected from audio analysis
     // Waveform data (pre-computed)
     waveformPeaks: v.optional(v.array(v.number())),
     createdAt: v.number(),
@@ -278,17 +261,16 @@ export default defineSchema({
 
 ```
 users
-  └── bandMemberships (many)
+  └── bands (many, via createdBy)
   └── recordingProjects (many)
   └── practiceSessions (many)
   └── bounceComments (many)
   └── uploadRateLimits (one)
 
 bands
-  └── bandMemberships (many)
   └── songs (many)
   └── setlists (many)
-  └── recordingProjects (many)
+  └── recordingProjects (many, optional link)
 
 songs
   └── songFiles (many)
@@ -325,17 +307,14 @@ const activeSongs = await ctx.db
   .collect();
 ```
 
-### Get user's bands (via membership)
+### Get user's bands (single-user model)
 ```typescript
-const memberships = await ctx.db
-  .query("bandMemberships")
-  .withIndex("by_user", q => q.eq("userId", userId))
-  .filter(q => q.eq(q.field("leftAt"), undefined))
+// Simple: just query by createdBy
+const bands = await ctx.db
+  .query("bands")
+  .withIndex("by_created_by", q => q.eq("createdBy", userId))
+  .filter(q => q.eq(q.field("deletedAt"), undefined))
   .collect();
-
-const bands = await Promise.all(
-  memberships.map(m => ctx.db.get(m.bandId))
-);
 ```
 
 ### Soft delete

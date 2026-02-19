@@ -1,4 +1,5 @@
 export { PracticeStatusBadge, PRACTICE_STATUS_OPTIONS } from "./PracticeStatusBadge";
+export { PracticeStatusDropdown } from "./PracticeStatusDropdown";
 export type { PracticeStatus } from "./PracticeStatusBadge";
 export { SongCard } from "./SongCard";
 export { SongList } from "./SongList";
@@ -7,5 +8,3 @@ export { FileUploadDropzone, FileTypeIcon } from "./FileUploadDropzone";
 export { ExternalUrlDialog } from "./ExternalUrlDialog";
 export { EditFileDialog } from "./EditFileDialog";
 export { SongFilesSection } from "./SongFilesSection";
-export { PersonalNotesSection } from "./PersonalNotesSection";
-export { PersonalPracticeStatus } from "./PersonalPracticeStatus";

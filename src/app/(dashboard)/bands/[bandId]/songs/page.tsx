@@ -15,8 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SongList, CreateSongDialog, PracticeStatus } from "@/components/songs";
-import { ArrowLeft, Plus, Music, Users } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, Plus, Music } from "lucide-react";
 
 export default function BandSongsPage() {
   const params = useParams();
@@ -28,11 +27,29 @@ export default function BandSongsPage() {
 
   const band = useQuery(api.bands.get, { id: bandId });
   const songs = useQuery(api.songs.listByBand, { bandId });
-  const userProgress = useQuery(api.userSongProgress.listByBand, { bandId });
 
-  const isLoading = band === undefined || songs === undefined || userProgress === undefined;
+  const isLoading = band === undefined || songs === undefined;
 
-  // Not a member or band doesn't exist
+  // Filter songs by practice status (hooks must be called unconditionally)
+  const filteredSongs = useMemo(() => {
+    if (!songs) return [];
+    if (statusFilter === "all") return songs;
+    return songs.filter((song) => song.practiceStatus === statusFilter);
+  }, [songs, statusFilter]);
+
+  // Get counts by status
+  const statusCounts = useMemo(() => {
+    if (!songs) return { all: 0, new: 0, learning: 0, solid: 0, performance_ready: 0 };
+    return {
+      all: songs.length,
+      new: songs.filter((s) => s.practiceStatus === "new").length,
+      learning: songs.filter((s) => s.practiceStatus === "learning").length,
+      solid: songs.filter((s) => s.practiceStatus === "solid").length,
+      performance_ready: songs.filter((s) => s.practiceStatus === "performance_ready").length,
+    };
+  }, [songs]);
+
+  // Not owner or band doesn't exist
   if (band === null) {
     return (
       <div className="space-y-6">
@@ -53,28 +70,6 @@ export default function BandSongsPage() {
       </div>
     );
   }
-
-  // Helper to get user's practice status for a song (defaults to "new")
-  const getUserStatus = (songId: string) => userProgress?.[songId]?.practiceStatus ?? "new";
-
-  // Filter songs by user's personal practice status
-  const filteredSongs = useMemo(() => {
-    if (!songs) return [];
-    if (statusFilter === "all") return songs;
-    return songs.filter((song) => getUserStatus(song._id) === statusFilter);
-  }, [songs, userProgress, statusFilter]);
-
-  // Get counts by user's personal status
-  const statusCounts = useMemo(() => {
-    if (!songs) return { all: 0, new: 0, learning: 0, solid: 0, performance_ready: 0 };
-    return {
-      all: songs.length,
-      new: songs.filter((s) => getUserStatus(s._id) === "new").length,
-      learning: songs.filter((s) => getUserStatus(s._id) === "learning").length,
-      solid: songs.filter((s) => getUserStatus(s._id) === "solid").length,
-      performance_ready: songs.filter((s) => getUserStatus(s._id) === "performance_ready").length,
-    };
-  }, [songs, userProgress]);
 
   return (
     <div className="space-y-6">
@@ -105,18 +100,10 @@ export default function BandSongsPage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/bands/${bandId}/members`}>
-              <Users className="mr-2 h-4 w-4" />
-              Members
-            </Link>
-          </Button>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Song
-          </Button>
-        </div>
+        <Button onClick={() => setShowCreateDialog(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Song
+        </Button>
       </div>
 
       {/* Status filter tabs */}
@@ -164,7 +151,7 @@ export default function BandSongsPage() {
               ))}
             </div>
           ) : filteredSongs && filteredSongs.length > 0 ? (
-            <SongList songs={filteredSongs} userProgress={userProgress} />
+            <SongList songs={filteredSongs} />
           ) : songs && songs.length > 0 ? (
             // Has songs but none match filter
             <Card>
@@ -188,8 +175,7 @@ export default function BandSongsPage() {
                   No songs yet
                 </CardTitle>
                 <CardDescription>
-                  Add your first song to start tracking your band&apos;s
-                  repertoire.
+                  Add your first song to start tracking your repertoire.
                 </CardDescription>
               </CardHeader>
               <CardContent>

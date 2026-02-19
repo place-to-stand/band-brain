@@ -39,7 +39,7 @@ async function getQueryUserId(ctx: QueryCtx): Promise<Id<"users"> | null> {
 }
 
 /**
- * Verify user is a member of the band that owns the song
+ * Verify user owns the band that owns the song
  */
 async function verifySongAccess(
   ctx: QueryCtx | MutationCtx,
@@ -51,15 +51,13 @@ async function verifySongAccess(
     throw new Error("Song not found");
   }
 
-  const membership = await ctx.db
-    .query("bandMemberships")
-    .withIndex("by_band_user", (q) =>
-      q.eq("bandId", song.bandId).eq("userId", userId)
-    )
-    .first();
+  const band = await ctx.db.get(song.bandId);
+  if (!band || band.deletedAt) {
+    throw new Error("Band not found");
+  }
 
-  if (!membership || membership.leftAt) {
-    throw new Error("Not a member of this band");
+  if (band.createdBy !== userId) {
+    throw new Error("Not authorized to access this song");
   }
 
   return song.bandId;
@@ -329,5 +327,176 @@ export const softDelete = mutation({
     });
 
     return args.id;
+  },
+});
+
+/**
+ * Get all unique gear names the user has ever used (for autocomplete)
+ */
+export const getAllGearNames = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getQueryUserId(ctx);
+    if (!userId) {
+      return [];
+    }
+
+    // Get all bands owned by user
+    const bands = await ctx.db
+      .query("bands")
+      .withIndex("by_created_by", (q) => q.eq("createdBy", userId))
+      .collect();
+
+    const activeBands = bands.filter((b) => !b.deletedAt);
+    if (activeBands.length === 0) {
+      return [];
+    }
+
+    // Get all songs from user's bands
+    const allSongs = await Promise.all(
+      activeBands.map((band) =>
+        ctx.db
+          .query("songs")
+          .withIndex("by_band_active", (q) =>
+            q.eq("bandId", band._id).eq("deletedAt", undefined)
+          )
+          .collect()
+      )
+    );
+    const songs = allSongs.flat();
+
+    // Get all sections from all songs
+    const allSections = await Promise.all(
+      songs.map((song) =>
+        ctx.db
+          .query("songSections")
+          .withIndex("by_song_active", (q) =>
+            q.eq("songId", song._id).eq("deletedAt", undefined)
+          )
+          .collect()
+      )
+    );
+    const sections = allSections.flat();
+
+    // Extract unique gear names
+    const gearNames = new Set<string>();
+    for (const section of sections) {
+      if (section.gearSettings?.gear) {
+        for (const gear of section.gearSettings.gear) {
+          if (gear.name.trim()) {
+            gearNames.add(gear.name.trim());
+          }
+        }
+      }
+    }
+
+    // Return sorted array
+    return Array.from(gearNames).sort((a, b) =>
+      a.toLowerCase().localeCompare(b.toLowerCase())
+    );
+  },
+});
+
+// ============ GEAR SETTINGS ============
+
+// Validators matching the schema
+const knobValidator = v.object({
+  label: v.string(),
+  position: v.number(),
+});
+
+const gearPieceValidator = v.object({
+  name: v.string(),
+  type: v.string(),
+  enabled: v.boolean(),
+  knobs: v.array(knobValidator),
+  patch: v.optional(v.string()),
+  patchName: v.optional(v.string()),
+  isOverride: v.optional(v.boolean()),
+  notes: v.optional(v.string()),
+});
+
+const gearSettingsValidator = v.object({
+  gear: v.array(gearPieceValidator),
+  notes: v.optional(v.string()),
+});
+
+/**
+ * Update gear settings for a section
+ */
+export const updateGearSettings = mutation({
+  args: {
+    id: v.id("songSections"),
+    gearSettings: gearSettingsValidator,
+  },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId(ctx);
+
+    const section = await ctx.db.get(args.id);
+    if (!section || section.deletedAt) {
+      throw new Error("Section not found");
+    }
+
+    // Verify song access
+    await verifySongAccess(ctx, section.songId, userId);
+
+    await ctx.db.patch(args.id, {
+      gearSettings: args.gearSettings,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
+
+/**
+ * Create a section with gear settings in one call
+ */
+export const createWithGear = mutation({
+  args: {
+    songId: v.id("songs"),
+    instrument: v.string(),
+    name: v.string(),
+    notes: v.optional(v.string()),
+    gearSettings: v.optional(gearSettingsValidator),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId(ctx);
+
+    // Verify song access
+    await verifySongAccess(ctx, args.songId, userId);
+
+    // Validate name
+    if (!args.name.trim()) {
+      throw new Error("Section name is required");
+    }
+
+    // Get existing sections for this instrument to determine position
+    const existingSections = await ctx.db
+      .query("songSections")
+      .withIndex("by_song_instrument", (q) =>
+        q.eq("songId", args.songId).eq("instrument", args.instrument)
+      )
+      .collect();
+
+    const activeSections = existingSections.filter((s) => !s.deletedAt);
+    const maxPosition =
+      activeSections.length > 0
+        ? Math.max(...activeSections.map((s) => s.position))
+        : -1;
+
+    const now = Date.now();
+
+    const sectionId = await ctx.db.insert("songSections", {
+      songId: args.songId,
+      instrument: args.instrument,
+      name: args.name.trim(),
+      position: maxPosition + 1,
+      notes: args.notes?.trim(),
+      gearSettings: args.gearSettings,
+      createdAt: now,
+    });
+
+    return sectionId;
   },
 });

@@ -1,6 +1,6 @@
 # UI Components & Structure
 
-> **Related:** [PROGRESS.md](./PROGRESS.md) | [SCHEMA.md](./SCHEMA.md)
+> **Related:** [PROGRESS.md](./PROGRESS.md) | [SCHEMA.md](./SCHEMA.md) | [FUTURE_CONSIDERATIONS.md](./FUTURE_CONSIDERATIONS.md)
 
 ## Overview
 
@@ -9,8 +9,9 @@ The app uses:
 - **Tailwind CSS** for styling
 - **shadcn/ui** for component primitives
 - **wavesurfer.js** for waveform visualization
-- **AlphaTab** for Guitar Pro rendering (lazy loaded)
 - **Tone.js** for audio synthesis (training tools)
+
+> **Note:** AlphaTab for Guitar Pro rendering is deferred. See [FUTURE_CONSIDERATIONS.md](./FUTURE_CONSIDERATIONS.md).
 
 ---
 
@@ -26,21 +27,17 @@ app/
 │   ├── layout.tsx             # Auth check, sidebar navigation
 │   │
 │   ├── bands/
-│   │   ├── page.tsx           # Band list
-│   │   ├── [bandId]/
-│   │   │   ├── page.tsx       # Band dashboard
-│   │   │   ├── songs/
-│   │   │   │   ├── page.tsx   # Song list
-│   │   │   │   └── [songId]/
-│   │   │   │       └── page.tsx # Song detail
-│   │   │   ├── setlists/
-│   │   │   │   ├── page.tsx   # Setlist list
-│   │   │   │   └── [setlistId]/
-│   │   │   │       └── page.tsx # Setlist view
-│   │   │   └── members/
-│   │   │       └── page.tsx   # Member management
-│   │   └── join/
-│   │       └── page.tsx       # Join via invite code
+│   │   ├── page.tsx           # Band list (user's personal bands)
+│   │   └── [bandId]/
+│   │       ├── page.tsx       # Band dashboard
+│   │       ├── songs/
+│   │       │   ├── page.tsx   # Song list
+│   │       │   └── [songId]/
+│   │       │       └── page.tsx # Song detail
+│   │       └── setlists/
+│   │           ├── page.tsx   # Setlist list
+│   │           └── [setlistId]/
+│   │               └── page.tsx # Setlist view
 │   │
 │   ├── recording/
 │   │   ├── page.tsx           # Recording projects list
@@ -48,7 +45,7 @@ app/
 │   │       └── page.tsx       # Project detail with tracking grid
 │   │
 │   ├── training/
-│   │   └── page.tsx           # Metronome, drone, chord player
+│   │   └── page.tsx           # Metronome, drone player
 │   │
 │   └── settings/
 │       └── page.tsx           # User settings, data export
@@ -77,9 +74,6 @@ components/
 │   ├── WaveformPlayer.tsx     # wavesurfer.js wrapper
 │   └── AudioUploader.tsx      # File upload with progress
 │
-├── tab/
-│   └── AlphaTabViewer.tsx     # Guitar Pro viewer (lazy)
-│
 ├── gear/
 │   ├── KnobDial.tsx           # Visual knob control
 │   ├── GearPieceEditor.tsx    # Single gear piece
@@ -87,8 +81,7 @@ components/
 │
 ├── training/
 │   ├── Metronome.tsx
-│   ├── DronePlayer.tsx
-│   └── ChordProgressionPlayer.tsx
+│   └── DronePlayer.tsx
 │
 ├── recording/
 │   ├── TrackingGrid.tsx       # Status matrix
@@ -106,9 +99,7 @@ components/
 │   └── PracticeStatusBadge.tsx
 │
 ├── band/
-│   ├── BandCard.tsx
-│   ├── InviteCodeGenerator.tsx
-│   └── MemberList.tsx
+│   └── BandCard.tsx           # Band card in list
 │
 └── ErrorBoundary.tsx          # Global error handling
 ```
@@ -213,89 +204,6 @@ export default function DashboardLayout({
 
 ---
 
-## AlphaTab Integration (Lazy Loaded)
-
-```typescript
-// components/tab/AlphaTabViewer.tsx
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-
-interface AlphaTabViewerProps {
-  fileUrl: string;
-  fileName?: string;
-}
-
-// Lazy load AlphaTab only when component is used
-export function AlphaTabViewer({ fileUrl, fileName }: AlphaTabViewerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let api: any = null;
-
-    const loadAlphaTab = async () => {
-      try {
-        // Dynamic import - only loads when needed
-        const alphaTab = await import("alphatab");
-
-        if (!containerRef.current) return;
-
-        api = new alphaTab.AlphaTabApi(containerRef.current, {
-          core: {
-            file: fileUrl,
-            fontDirectory: "/fonts/alphatab/",
-          },
-          display: {
-            layoutMode: alphaTab.LayoutMode.Page,
-            staveProfile: alphaTab.StaveProfile.Default,
-          },
-          player: {
-            enablePlayer: true,
-            enableCursor: true,
-            enableUserInteraction: true,
-            soundFont: "/soundfonts/default.sf2",
-          },
-        });
-
-        api.renderStarted.on(() => setIsLoading(true));
-        api.renderFinished.on(() => setIsLoading(false));
-        api.error.on((e: any) => setError(e.message));
-      } catch (err) {
-        setError("Failed to load tab viewer");
-        setIsLoading(false);
-      }
-    };
-
-    loadAlphaTab();
-
-    return () => {
-      api?.destroy();
-    };
-  }, [fileUrl]);
-
-  return (
-    <div className="relative">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-          <p>Loading tab...</p>
-        </div>
-      )}
-      {error && (
-        <div className="p-4 bg-red-50 text-red-700 rounded">
-          <p>Error: {error}</p>
-        </div>
-      )}
-      <div ref={containerRef} className="w-full min-h-[400px]" />
-    </div>
-  );
-}
-```
-
----
-
 ## Waveform Player
 
 ```typescript
@@ -388,7 +296,7 @@ export function WaveformPlayer({
         </span>
 
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-sm">🔊</span>
+          <span className="text-sm">Vol</span>
           <Slider
             value={[volume]}
             onValueChange={handleVolumeChange}

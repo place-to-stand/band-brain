@@ -73,19 +73,18 @@ async function getQueryUserId(ctx: QueryCtx): Promise<Id<"users"> | null> {
 }
 
 /**
- * Verify user is a member of the band
+ * Verify user owns the band
  */
-async function verifyBandMembership(
+async function verifyBandOwnership(
   ctx: QueryCtx | MutationCtx,
   bandId: Id<"bands">,
   userId: Id<"users">
 ): Promise<boolean> {
-  const membership = await ctx.db
-    .query("bandMemberships")
-    .withIndex("by_band_user", (q) => q.eq("bandId", bandId).eq("userId", userId))
-    .first();
-
-  return membership !== null && !membership.leftAt;
+  const band = await ctx.db.get(bandId);
+  if (!band || band.deletedAt) {
+    return false;
+  }
+  return band.createdBy === userId;
 }
 
 // ============ QUERIES ============
@@ -102,7 +101,7 @@ export const listByBand = query({
     }
 
     // Verify band membership
-    const isMember = await verifyBandMembership(ctx, args.bandId, userId);
+    const isMember = await verifyBandOwnership(ctx, args.bandId, userId);
     if (!isMember) {
       return [];
     }
@@ -159,7 +158,7 @@ export const get = query({
     }
 
     // Verify band membership
-    const isMember = await verifyBandMembership(ctx, song.bandId, userId);
+    const isMember = await verifyBandOwnership(ctx, song.bandId, userId);
     if (!isMember) {
       return null;
     }
@@ -203,9 +202,9 @@ export const create = mutation({
     const userId = await getCurrentUserId(ctx);
 
     // Verify band membership
-    const isMember = await verifyBandMembership(ctx, args.bandId, userId);
+    const isMember = await verifyBandOwnership(ctx, args.bandId, userId);
     if (!isMember) {
-      throw new Error("Not a member of this band");
+      throw new Error("Not authorized to access this band");
     }
 
     // Validate title
@@ -260,9 +259,9 @@ export const update = mutation({
     }
 
     // Verify band membership
-    const isMember = await verifyBandMembership(ctx, song.bandId, userId);
+    const isMember = await verifyBandOwnership(ctx, song.bandId, userId);
     if (!isMember) {
-      throw new Error("Not a member of this band");
+      throw new Error("Not authorized to access this band");
     }
 
     // Build update object
@@ -321,9 +320,9 @@ export const updatePracticeStatus = mutation({
     }
 
     // Verify band membership
-    const isMember = await verifyBandMembership(ctx, song.bandId, userId);
+    const isMember = await verifyBandOwnership(ctx, song.bandId, userId);
     if (!isMember) {
-      throw new Error("Not a member of this band");
+      throw new Error("Not authorized to access this band");
     }
 
     // Validate practice status
@@ -356,9 +355,9 @@ export const softDelete = mutation({
     }
 
     // Verify band membership
-    const isMember = await verifyBandMembership(ctx, song.bandId, userId);
+    const isMember = await verifyBandOwnership(ctx, song.bandId, userId);
     if (!isMember) {
-      throw new Error("Not a member of this band");
+      throw new Error("Not authorized to access this band");
     }
 
     const now = Date.now();

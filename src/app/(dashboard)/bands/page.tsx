@@ -11,13 +11,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { BandList, CreateBandDialog, JoinBandDialog } from "@/components/bands";
-import { Plus, Users } from "lucide-react";
+import { BandList, CreateBandDialog } from "@/components/bands";
+import { Plus } from "lucide-react";
 
 export default function BandsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showJoinDialog, setShowJoinDialog] = useState(false);
 
   const user = useQuery(api.users.current);
   const bands = useQuery(api.bands.listMyBands);
@@ -35,16 +33,10 @@ export default function BandsPage() {
           <p className="text-muted-foreground">Manage your bands and songs</p>
         </div>
         {hasBands && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowJoinDialog(true)}>
-              <Users className="mr-2 h-4 w-4" />
-              Join Band
-            </Button>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Band
-            </Button>
-          </div>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Band
+          </Button>
         )}
       </div>
 
@@ -74,30 +66,20 @@ export default function BandsPage() {
           <CardHeader>
             <CardTitle>No bands yet</CardTitle>
             <CardDescription>
-              Create your first band or join an existing one with an invite
-              code.
+              Create your first band to start managing songs, setlists, and gear
+              settings.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Band
-              </Button>
-              <Button variant="outline" onClick={() => setShowJoinDialog(true)}>
-                <Users className="mr-2 h-4 w-4" />
-                Join with Code
-              </Button>
-            </div>
-            <Separator />
-            <div className="text-sm text-muted-foreground space-y-2">
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Band
+            </Button>
+            <div className="text-sm text-muted-foreground">
               <p>
-                <strong>Create a band</strong> to start managing songs,
-                setlists, and gear settings with your bandmates.
-              </p>
-              <p>
-                <strong>Join with a code</strong> if someone has already created
-                a band and shared an invite code with you.
+                <strong>Bands</strong> are personal song collections. Create
+                one for each project, artist, or set of songs you want to
+                organize.
               </p>
             </div>
           </CardContent>
@@ -108,8 +90,6 @@ export default function BandsPage() {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
       />
-
-      <JoinBandDialog open={showJoinDialog} onOpenChange={setShowJoinDialog} />
     </div>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export type PracticeStatus = "new" | "learning" | "solid" | "performance_ready";
@@ -10,29 +9,23 @@ interface PracticeStatusBadgeProps {
   className?: string;
 }
 
-const STATUS_CONFIG: Record<
-  PracticeStatus,
-  { label: string; variant: "default" | "secondary" | "outline"; className: string }
-> = {
+// Colorful pill styles - consistent with dropdown
+const STATUS_CONFIG: Record<PracticeStatus, { label: string; className: string }> = {
   new: {
     label: "New",
-    variant: "outline",
-    className: "border-gray-300 text-gray-600",
+    className: "border-gray-300 text-gray-600 bg-gray-50",
   },
   learning: {
     label: "Learning",
-    variant: "secondary",
-    className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+    className: "bg-yellow-100 text-yellow-800 border-yellow-200",
   },
   solid: {
     label: "Solid",
-    variant: "secondary",
-    className: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+    className: "bg-blue-100 text-blue-800 border-blue-200",
   },
   performance_ready: {
-    label: "Performance Ready",
-    variant: "default",
-    className: "bg-green-600 hover:bg-green-600",
+    label: "Ready",
+    className: "bg-green-100 text-green-800 border-green-200",
   },
 };
 
@@ -40,12 +33,15 @@ export function PracticeStatusBadge({ status, className }: PracticeStatusBadgePr
   const config = STATUS_CONFIG[status];
 
   return (
-    <Badge
-      variant={config.variant}
-      className={cn(config.className, className)}
+    <span
+      className={cn(
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+        config.className,
+        className
+      )}
     >
       {config.label}
-    </Badge>
+    </span>
   );
 }
 
@@ -53,5 +49,5 @@ export const PRACTICE_STATUS_OPTIONS: { value: PracticeStatus; label: string }[]
   { value: "new", label: "New" },
   { value: "learning", label: "Learning" },
   { value: "solid", label: "Solid" },
-  { value: "performance_ready", label: "Performance Ready" },
+  { value: "performance_ready", label: "Ready" },
 ];
